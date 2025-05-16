@@ -1,6 +1,5 @@
 import type { Route } from "./+types/index";
 
-import { Badge } from "~/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -9,9 +8,10 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 
-import IndexCardMulti from "~/widgets/IndexCardMulti";
-import IndexTable from "~/widgets/IndexTable";
-import IndexLogin from "~/widgets/IndexLogin";
+import CardMulti from "~/widgets/CardMulti";
+import CardTable from "~/widgets/CardTable";
+import CardLogin from "~/widgets/CardLogin";
+import SummaryTable from "~/widgets/SummaryTable";
 import { useInterval } from "~/library/index/useInterval";
 
 import { useState, useEffect } from "react";
@@ -85,19 +85,19 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         </Select>
       </section>
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        <IndexCardMulti
+        <CardMulti
           title="Saaske API"
           keyNames={["saaske_api"]}
           hour={hour}
           now={now}
         />
-        <IndexCardMulti
+        <CardMulti
           title="Works"
           keyNames={["works07", "works09"]}
           hour={hour}
           now={now}
         />
-        <IndexCardMulti
+        <CardMulti
           title="サスケ"
           className="col-span-1 md:col-span-2"
           keyNames={["saaske02", "saaske04", "saaske07", "saaske09"]}
@@ -106,10 +106,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         />
       </section>
       <section className="grid grid-cols-1 gap-4">
-        <IndexTable className="col-span-1 md:col-span-2 xl:col-span-4" />
+        <SummaryTable
+          className="col-span-1 md:col-span-2 xl:col-span-4"
+          hour={hour}
+        />
       </section>
       <section className="grid grid-cols-1 gap-4">
-        <IndexLogin className="col-span-1 md:col-span-2 xl:col-span-4" />
+        <CardTable className="col-span-1 md:col-span-2 xl:col-span-4" />
+      </section>
+      <section className="grid grid-cols-1 gap-4">
+        <CardLogin className="col-span-1 md:col-span-2 xl:col-span-4" />
       </section>
     </main>
   );

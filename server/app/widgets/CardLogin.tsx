@@ -1,4 +1,4 @@
-import IndexLoading from "./indexLoading";
+import CardLoading from "./CardLoading";
 import { Button } from "~/components/ui/button";
 import {
   Card,
@@ -21,7 +21,7 @@ import { Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getColorListsFromKey } from "~/library/index/color";
 
-export default function IndexLogin({ className }: { className: string }) {
+export default function CardLogin({ className }: { className: string }) {
   const [data, setData] = useState(null);
   useEffect(() => {
     fetch(`/api/v1/targets`)
@@ -33,7 +33,7 @@ export default function IndexLogin({ className }: { className: string }) {
       {data ? (
         <List data={data} />
       ) : (
-        <IndexLoading className="border-neutral-800" />
+        <CardLoading className="border-neutral-800" />
       )}
     </Card>
   );

@@ -1,10 +1,10 @@
+import type { IndexCardMulti } from "@/types/indexCard";
+
 import { Button } from "~/components/ui/button";
 import {
-  Card,
   CardHeader,
   CardTitle,
   CardContent,
-  CardDescription,
 } from "~/components/ui/card";
 import {
   ChartContainer,
@@ -15,12 +15,10 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
   DialogFooter,
-  DialogClose,
 } from "~/components/ui/dialog";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
@@ -31,10 +29,8 @@ import {
   XAxis,
   YAxis,
   ReferenceLine,
-  ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import type { IndexCardMulti } from "@/types/indexCard";
 import { getColorListsFromKey } from "~/library/index/color";
 
 /**
@@ -58,7 +54,7 @@ function getMaxPerKey(data: IndexCardMulti[]) {
   return maxPerKey;
 }
 
-export default function IndexCardMultiCharts({
+export default function CardMultiCharts({
   title,
   data,
   rdsList,

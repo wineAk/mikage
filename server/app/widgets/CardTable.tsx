@@ -16,11 +16,11 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import IndexLoading from "./indexLoading";
+import CardLoading from "./CardLoading";
 import { getColorListsFromKey } from "~/library/index/color";
 import type { apiError } from "@/types/indexCard";
 
-export default function IndexTable({ className }: { className: string }) {
+export default function CardTable({ className }: { className: string }) {
   const [data, setData] = useState<apiError[] | null>(null);
   const [offset, setOffset] = useState(0);
 
@@ -42,7 +42,7 @@ export default function IndexTable({ className }: { className: string }) {
           onNext={handleNext}
         />
       ) : (
-        <IndexLoading className="border-red-800" />
+        <CardLoading className="border-red-800" />
       )}
     </Card>
   );

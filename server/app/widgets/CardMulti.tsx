@@ -1,17 +1,8 @@
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardDescription,
-  CardFooter
-} from "~/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
-
-import IndexCardMultiCharts from "./indexCardMultiCharts";
-import IndexCardMultiTable from "./IndexCardMultiTable";
-import IndexLoading from "./indexLoading";
 import type { IndexCard, IndexCardMulti } from "@/types/indexCard";
+
+import { Card } from "~/components/ui/card";
+import CardMultiCharts from "./CardMultiCharts";
+import CardLoading from "./CardLoading";
 import { getColorListsFromKey } from "~/library/index/color";
 import { useEffect, useState } from "react";
 
@@ -44,7 +35,7 @@ function mergeTargetsData(raw: IndexCard[]) {
   );
 }
 
-type IndexCardMultiProps = {
+type CardMultiProps = {
   title: string;
   className?: string;
   keyNames: string[];
@@ -52,13 +43,13 @@ type IndexCardMultiProps = {
   now: string;
 };
 
-export default function IndexCardMulti({
+export default function CardMulti({
   title,
   keyNames,
   hour,
   className,
   now,
-}: IndexCardMultiProps) {
+}: CardMultiProps) {
   const [data, setData] = useState<IndexCardMulti[] | null>(null);
   const [rdsList, setRdsList] = useState<string[]>(keyNames);
   const colorLists = getColorListsFromKey(keyNames[0]);
@@ -75,12 +66,9 @@ export default function IndexCardMulti({
   return (
     <Card className={`${className}`}>
       {data ? (
-        <>
-          <IndexCardMultiCharts data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
-          <IndexCardMultiTable data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
-        </>
+        <CardMultiCharts data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
       ) : (
-        <IndexLoading className={colorLists.border} />
+        <CardLoading className={colorLists.border} />
       )}
     </Card>
   );

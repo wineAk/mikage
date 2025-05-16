@@ -1,6 +1,6 @@
 import { CardHeader, CardTitle, CardContent } from "~/components/ui/card";
 
-export default function IndexLoading({ className }: { className: string }) {
+export default function CardLoading({ className }: { className: string }) {
   return (
     <>
       <CardHeader>
