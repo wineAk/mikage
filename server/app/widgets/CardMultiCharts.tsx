@@ -86,7 +86,7 @@ export default function CardMultiCharts({
   return (
     <>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex items-center justify-between h-8">
           <span>{title}</span>
           <Dialog>
             <DialogTrigger asChild className={title === "サスケ" ? "" : "hidden" }>
@@ -110,6 +110,9 @@ export default function CardMultiCharts({
                   "saaske07",
                   "saaske08",
                   "saaske09",
+                  "saaske_api",
+                  "saaske_webform",
+                  "saaske_webtracking",
                 ].map((key) => {
                   const isChecked = rdsList.includes(key);
                   return (

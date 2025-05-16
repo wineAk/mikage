@@ -10,8 +10,8 @@ import {
 
 import CardMulti from "~/widgets/CardMulti";
 import ErrorsTable from "~/widgets/ErrorsTable";
-import CardLogin from "~/widgets/CardLogin";
 import SummaryTable from "~/widgets/SummaryTable";
+import CardLogin from "~/widgets/CardLogin";
 import { useInterval } from "~/library/index/useInterval";
 
 import { useState, useEffect } from "react";
@@ -86,8 +86,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       </section>
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <CardMulti
-          title="Saaske API"
-          keyNames={["saaske_api"]}
+          title="ホームページ"
+          keyNames={["web_interpark", "web_saaske", "web_works"]}
           hour={hour}
           now={now}
         />
@@ -100,7 +100,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <CardMulti
           title="サスケ"
           className="col-span-1 md:col-span-2"
-          keyNames={["saaske02", "saaske04", "saaske07", "saaske09"]}
+          keyNames={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
           hour={hour}
           now={now}
         />

@@ -54,7 +54,7 @@ function List({ data }: { data: any[] }) {
           const { border, bg, text, hoverBg } = colorLists;
           return (
             <Dialog key={key}>
-              <DialogTrigger>
+              <DialogTrigger asChild>
                 <Button
                   key={key}
                   className={`${border} ${bg} ${text} ${hoverBg} cursor-pointer w-full`}
