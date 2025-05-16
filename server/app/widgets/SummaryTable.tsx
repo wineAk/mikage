@@ -53,7 +53,7 @@ export default function SummaryTable({
   hour,
 }: {
   className: string;
-  hour: string;
+  hour: string | null;
 }) {
   const [data, setData] = useState<Row[] | null>(null);
 
@@ -74,7 +74,7 @@ export default function SummaryTable({
       {data ? (
         <>
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
+            <CardTitle className="flex items-center justify-between h-8">
               <span>サマリー</span>
             </CardTitle>
           </CardHeader>

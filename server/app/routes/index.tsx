@@ -9,7 +9,7 @@ import {
 } from "~/components/ui/select";
 
 import CardMulti from "~/widgets/CardMulti";
-import CardTable from "~/widgets/CardTable";
+import ErrorsTable from "~/widgets/ErrorsTable";
 import CardLogin from "~/widgets/CardLogin";
 import SummaryTable from "~/widgets/SummaryTable";
 import { useInterval } from "~/library/index/useInterval";
@@ -105,14 +105,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           now={now}
         />
       </section>
-      <section className="grid grid-cols-1 gap-4">
-        <SummaryTable
-          className="col-span-1 md:col-span-2 xl:col-span-4"
-          hour={hour}
-        />
-      </section>
-      <section className="grid grid-cols-1 gap-4">
-        <CardTable className="col-span-1 md:col-span-2 xl:col-span-4" />
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <SummaryTable className="col-span-1" hour={hour} />
+        <ErrorsTable className="col-span-1" />
       </section>
       <section className="grid grid-cols-1 gap-4">
         <CardLogin className="col-span-1 md:col-span-2 xl:col-span-4" />
