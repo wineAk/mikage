@@ -9,6 +9,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from "~/components/ui/toggle-group";
 
 import IndexCardMultiCharts from "./indexCardMultiCharts";
+import IndexCardMultiTable from "./IndexCardMultiTable";
 import IndexLoading from "./indexLoading";
 import type { IndexCard, IndexCardMulti } from "@/types/indexCard";
 import { getColorListsFromKey } from "~/library/index/color";
@@ -24,7 +25,7 @@ function mergeTargetsData(raw: IndexCard[]) {
     const date = new Date(datetime);
     date.setSeconds(0);
     date.setMilliseconds(0);
-    date.setMinutes(Math.floor(date.getMinutes() / 5) * 5);
+    //date.setMinutes(Math.floor(date.getMinutes() / 5) * 5);
     return date.toISOString();
   };
   const map = new Map<string, any>();
@@ -74,7 +75,10 @@ export default function IndexCardMulti({
   return (
     <Card className={`${className}`}>
       {data ? (
-        <IndexCardMultiCharts data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
+        <>
+          <IndexCardMultiCharts data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
+          <IndexCardMultiTable data={data} rdsList={rdsList} setRdsList={setRdsList} title={title} />
+        </>
       ) : (
         <IndexLoading className={colorLists.border} />
       )}

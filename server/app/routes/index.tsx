@@ -79,6 +79,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <SelectItem value="24" className="cursor-pointer">24時間</SelectItem>
             <SelectItem value="72" className="cursor-pointer">3日間</SelectItem>
             <SelectItem value="168" className="cursor-pointer">7日間</SelectItem>
+            <SelectItem value="336" className="cursor-pointer">14日間</SelectItem>
+            <SelectItem value="672" className="cursor-pointer">28日間</SelectItem>
           </SelectContent>
         </Select>
       </section>

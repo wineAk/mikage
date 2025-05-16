@@ -17,10 +17,7 @@ export type IndexCard = {
 
 export type IndexCardMulti = {
   checked_at: string;
-  saaske02: number;
-  saaske04: number;
-  saaske07: number;
-  saaske09: number;
+  [key: string]: number | string;
 };
 
 export type apiError = {
