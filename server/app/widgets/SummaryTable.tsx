@@ -7,6 +7,7 @@ import {
   CardTitle,
   CardFooter,
 } from "~/components/ui/card";
+import { ScrollArea } from "~/components/ui/scroll-area"
 import {
   Table,
   TableBody,
@@ -80,9 +81,9 @@ export default function SummaryTable({
           </CardHeader>
 
           <CardContent>
-            <div className="max-h-[460px] relative overflow-y-auto">
+            <ScrollArea className="h-[460px] relative pb-1">
               <table className="w-full caption-bottom text-sm">
-                <TableHeader className="sticky top-0 z-10 bg-white">
+                <TableHeader className="sticky top-0 z-1 bg-white">
                   <TableRow>
                     <TableHead>名前</TableHead>
                     <TableHead>最大</TableHead>
@@ -121,7 +122,7 @@ export default function SummaryTable({
                   })}
                 </TableBody>
               </table>
-            </div>
+            </ScrollArea>
           </CardContent>
         </>
       ) : (

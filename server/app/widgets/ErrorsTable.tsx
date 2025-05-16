@@ -8,6 +8,7 @@ import {
   CardTitle,
   CardFooter,
 } from "~/components/ui/card";
+import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area"
 import {
   Table,
   TableBody,
@@ -148,7 +149,7 @@ function TableList({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="max-h-[460px] relative overflow-y-auto">
+        <ScrollArea className="h-[460px] relative pb-1">
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-white">
               <TableRow>
@@ -161,7 +162,8 @@ function TableList({
             </TableHeader>
             <TableBody>{tableList}</TableBody>
           </table>
-        </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
       </CardContent>
     </>
   );
