@@ -80,46 +80,48 @@ export default function SummaryTable({
           </CardHeader>
 
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>名前</TableHead>
-                  <TableHead>最大</TableHead>
-                  <TableHead>最小</TableHead>
-                  <TableHead>平均</TableHead>
-                  <TableHead>中央値</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((row) => {
-                  const { key, name, logs } = row;
-                  const stats = calcStatsFromLogs(logs);
-                  const bgColor = getColorListsFromKey(key).bg;
-                  return (
-                    <TableRow key={key}>
-                      <TableCell>
-                        <span
-                          className={`inline-block h-3 w-3 mr-2 rounded-sm ${bgColor}`}
-                        />
-                        {name}
-                      </TableCell>
-                      <TableCell className={getCellClass(stats.max)}>
-                        {msToSecStr(stats.max)}
-                      </TableCell>
-                      <TableCell className={getCellClass(stats.min)}>
-                        {msToSecStr(stats.min)}
-                      </TableCell>
-                      <TableCell className={getCellClass(stats.avg)}>
-                        {msToSecStr(stats.avg)}
-                      </TableCell>
-                      <TableCell className={getCellClass(stats.median)}>
-                        {msToSecStr(stats.median)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+            <div className="max-h-[460px] relative overflow-y-auto">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader className="sticky top-0 z-10 bg-white">
+                  <TableRow>
+                    <TableHead>名前</TableHead>
+                    <TableHead>最大</TableHead>
+                    <TableHead>最小</TableHead>
+                    <TableHead>平均</TableHead>
+                    <TableHead>中央値</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.map((row) => {
+                    const { key, name, logs } = row;
+                    const stats = calcStatsFromLogs(logs);
+                    const bgColor = getColorListsFromKey(key).bg;
+                    return (
+                      <TableRow key={key}>
+                        <TableCell>
+                          <span
+                            className={`inline-block h-3 w-3 mr-2 rounded-sm ${bgColor}`}
+                          />
+                          {name}
+                        </TableCell>
+                        <TableCell className={getCellClass(stats.max)}>
+                          {msToSecStr(stats.max)}
+                        </TableCell>
+                        <TableCell className={getCellClass(stats.min)}>
+                          {msToSecStr(stats.min)}
+                        </TableCell>
+                        <TableCell className={getCellClass(stats.avg)}>
+                          {msToSecStr(stats.avg)}
+                        </TableCell>
+                        <TableCell className={getCellClass(stats.median)}>
+                          {msToSecStr(stats.median)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </table>
+            </div>
           </CardContent>
         </>
       ) : (

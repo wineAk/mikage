@@ -148,18 +148,20 @@ function TableList({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>日時</TableHead>
-              <TableHead>環境</TableHead>
-              <TableHead>読込速度</TableHead>
-              <TableHead>ステータス</TableHead>
-              <TableHead>エラー</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>{tableList}</TableBody>
-        </Table>
+        <div className="max-h-[460px] relative overflow-y-auto">
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-10 bg-white">
+              <TableRow>
+                <TableHead>日時</TableHead>
+                <TableHead>環境</TableHead>
+                <TableHead>読込速度</TableHead>
+                <TableHead>ステータス</TableHead>
+                <TableHead>エラー</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>{tableList}</TableBody>
+          </table>
+        </div>
       </CardContent>
     </>
   );
