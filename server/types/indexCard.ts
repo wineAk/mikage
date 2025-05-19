@@ -1,7 +1,7 @@
 export type DataLog = {
   target_id: number;
   response_time: number;
-  checked_at: string;
+  created_at: string;
 };
 
 export type DataTarget = {
@@ -16,14 +16,14 @@ export type IndexCard = {
 };
 
 export type IndexCardMulti = {
-  checked_at: string;
+  created_at: string;
   [key: string]: number | string;
 };
 
 export type apiError = {
   target_key: string;
   name: string;
-  checked_at: Date;
+  created_at: Date;
   response_time: number | null;
   status_code: number | null;
   status_message: string | null;

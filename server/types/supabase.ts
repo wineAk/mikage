@@ -55,9 +55,33 @@ export type Database = {
         }
         Relationships: []
       }
+      incidents: {
+        Row: {
+          count: number | null
+          created_at: string
+          id: number
+          keyword: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          count?: number | null
+          created_at?: string
+          id?: number
+          keyword?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          count?: number | null
+          created_at?: string
+          id?: number
+          keyword?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       logs: {
         Row: {
-          checked_at: string
+          created_at: string
           error_code: string | null
           error_name: string | null
           id: number
@@ -67,7 +91,7 @@ export type Database = {
           target_key: string
         }
         Insert: {
-          checked_at: string
+          created_at: string
           error_code?: string | null
           error_name?: string | null
           id?: number
@@ -77,7 +101,7 @@ export type Database = {
           target_key: string
         }
         Update: {
-          checked_at?: string
+          created_at?: string
           error_code?: string | null
           error_name?: string | null
           id?: number
@@ -88,7 +112,7 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "got_logs_target_key_fkey"
+            foreignKeyName: "logs_target_key_fkey"
             columns: ["target_key"]
             isOneToOne: false
             referencedRelation: "targets"
@@ -124,6 +148,10 @@ export type Database = {
     Functions: {
       get_error_logs: {
         Args: { start_offset: number; end_offset: number }
+        Returns: Json
+      }
+      get_error_logs_: {
+        Args: { start_offset: number; end_offset: number }
         Returns: {
           target_key: string
           name: string
@@ -137,15 +165,7 @@ export type Database = {
       }
       get_logs_in_range: {
         Args: { keys: string[]; start_time: string; end_time: string }
-        Returns: {
-          target_key: string
-          checked_at: string
-          response_time: number
-          status_code: number
-          status_message: string
-          error_name: string
-          error_code: string
-        }[]
+        Returns: Json
       }
     }
     Enums: {
