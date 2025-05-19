@@ -1,3 +1,4 @@
+import type { Target } from "@/types/api";
 import CardLoading from "./CardLoading";
 import { Button } from "~/components/ui/button";
 import {
@@ -21,17 +22,11 @@ import { Sun, Moon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getColorListsFromKey } from "~/library/index/color";
 
-export default function CardLogin({ className }: { className: string }) {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    fetch(`/api/v1/targets`)
-      .then((res) => res.json())
-      .then((res) => setData(res.data));
-  }, []);
+export default function CardLogin({ className, targets }: { className: string, targets: Target[] }) {
   return (
     <Card className={`${className}`}>
-      {data ? (
-        <List data={data} />
+      {targets && targets.length > 0 ? (
+        <List targets={targets} />
       ) : (
         <CardLoading className="border-neutral-800" />
       )}
@@ -39,7 +34,7 @@ export default function CardLogin({ className }: { className: string }) {
   );
 }
 
-function List({ data }: { data: any[] }) {
+function List({ targets }: { targets: Target[] }) {
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   return (
@@ -48,8 +43,8 @@ function List({ data }: { data: any[] }) {
         <CardTitle>ログイン</CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 md:grid-cols-5 xl:grid-cols-10 gap-2">
-        {data.map((data) => {
-          const { name, key } = data;
+        {targets.map((target) => {
+          const { name, key } = target;
           const colorLists = getColorListsFromKey(key);
           const { border, bg, text, hoverBg } = colorLists;
           return (

@@ -58,17 +58,16 @@ function getMaxPerKey(data: MargeLog[]) {
 export default function CardMultiCharts({
   targets,
   title,
-  list,
+  margeLogs,
   rdsList,
   setRdsList,
 }: {
   targets: Target[];
   title: string;
-  list: ChartProps;
+  margeLogs: MargeLog[];
   rdsList: string[];
   setRdsList: (value: string[]) => void;
 }) {
-  const { margeLogs } = list;
   const THRESHOLD = 3000;
 
   const chartConfig: ChartConfig = Object.fromEntries(

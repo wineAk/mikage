@@ -1,5 +1,6 @@
 import type { Route } from "./+types/index";
-import type { Target } from "@/types/api";
+import type { MargeLog } from "@/types/indexCard";
+import type { Key, Target } from "@/types/api";
 
 import {
   Select,
@@ -24,11 +25,6 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-/**
- *
- * @param str - ISO8601形式の文字列（例：2023-10-01T12:34:56Z）
- * @returns str
- */
 function timeFormatter(str?: string) {
   const date = str ? new Date(str) : new Date();
   return date.toLocaleString("ja-JP", {
@@ -41,11 +37,46 @@ function timeFormatter(str?: string) {
   });
 }
 
+function mergeLogs(keys: string[], logs: Key[]): MargeLog[] {
+  const margeLogs: Map<string, MargeLog> = new Map();
+  for (const key of keys) {
+    const findedLogs = logs.find((log) => log.key === key);
+    if (findedLogs) {
+      for (const log of findedLogs.logs) {
+        const { created_at, response_time } = log;
+        const created_date = new Date(created_at);
+        created_date.setSeconds(0);
+        created_date.setMilliseconds(0);
+        const created_date_str = created_date.toISOString();
+        if (margeLogs.has(created_date_str)) {
+          margeLogs.get(created_date_str)![key] = response_time ?? 0;
+        } else {
+          margeLogs.set(created_date_str, { created_at: created_date_str, [key]: response_time ?? 0 });
+        }
+      }
+    }
+  }
+  return Array.from(margeLogs.values());
+}
+
 export async function loader({ request }: Route.LoaderArgs) {}
 
 export default function Index({ loaderData }: Route.ComponentProps) {
+
+  // 表示時間
+  const [minute, setMinute] = useState<string | null>(null);
+  useEffect(() => setMinute("60*1"), []);
+
   // 更新日
   const [now, setNow] = useState("読み込み中……");
+  // クライアントで初期化
+  useEffect(() => {
+    setNow(timeFormatter());
+  }, []);
+  // 5分に1度更新
+  useInterval(() => {
+    setNow(timeFormatter());
+  }, 5 * 60 * 1000);
 
   // データ取得
   const [targets, setTargets] = useState<Target[]>([]);
@@ -55,19 +86,17 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       .then((res) => setTargets(res.data));
   }, []);
 
-  // クライアントで初期化
+  const [logs, setLogs] = useState<Key[]>([]);
   useEffect(() => {
-    setNow(timeFormatter());
-  }, []);
-  
-  // 5分に1度更新
-  useInterval(() => {
-    setNow(timeFormatter());
-  }, 5 * 60 * 1000);
-
-  // 表示時間
-  const [minute, setMinute] = useState<string | null>(null);
-  useEffect(() => setMinute("60*1"), []);
+    if (!now || !minute || targets.length === 0) return;
+    const targetKeys = targets.map((target) => target.key);
+    const minuteValue = minute.split("*").map(Number).reduce((a, b) => a * b, 1);
+    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
+      .then((res) => res.json())
+      .then((res) => {
+        setLogs(res.data)
+      });
+  }, [now, minute, targets]);
 
   return (
     <main className="flex flex-col gap-4 p-4">
@@ -100,6 +129,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <CardMulti
           title="ホームページ"
+          margeLogs={mergeLogs(["web_interpark", "web_saaske", "web_works"], logs)}
           targets={targets}
           keyNames={["web_interpark", "web_saaske", "web_works"]}
           minute={minute}
@@ -107,6 +137,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         />
         <CardMulti
           title="Works"
+          margeLogs={mergeLogs(["works07", "works09"], logs)}
           targets={targets}
           keyNames={["works07", "works09"]}
           minute={minute}
@@ -114,6 +145,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         />
         <CardMulti
           title="サスケ"
+          margeLogs={mergeLogs(["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"], logs)}
           className="col-span-1 md:col-span-2"
           targets={targets}
           keyNames={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
@@ -126,7 +158,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <ErrorsTable className="col-span-1" />
       </section>
       <section className="grid grid-cols-1 gap-4">
-        <CardLogin className="col-span-1 md:col-span-2 xl:col-span-4" />
+        <CardLogin 
+          targets={targets}
+          className="col-span-1 md:col-span-2 xl:col-span-4"
+        />
       </section>
     </main>
   );

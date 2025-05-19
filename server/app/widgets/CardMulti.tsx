@@ -32,6 +32,7 @@ function mergeTargetsData(raw: Key[]): MargeLog[] {
 
 type CardMultiProps = {
   title: string;
+  margeLogs: MargeLog[];
   className?: string;
   targets: Target[];
   keyNames: string[];
@@ -41,38 +42,22 @@ type CardMultiProps = {
 
 export default function CardMulti({
   title,
+  margeLogs,
   targets,
   keyNames,
   minute,
   className,
   now,
-}: CardMultiProps) {
-  const [data, setData] = useState<ChartProps | null>(null);
+}: CardMultiProps) {  
   const [rdsList, setRdsList] = useState<string[]>(keyNames);
   const colorLists = getColorListsFromKey(keyNames[0]);
-  useEffect(() => {
-    if (!minute) return;
-    // 分を計算
-    const minuteValue = minute
-      .split("*")
-      .map(Number)
-      .reduce((a, b) => a * b, 1);
-    // データ取得
-    fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValue}`)
-      .then((res) => res.json())
-      .then((res) => {
-        const keyLogs = res.data as Key[];
-        const margeLogs = mergeTargetsData(keyLogs);
-        setData({ margeLogs });
-      });
-  }, [now, minute, rdsList]);
 
   return (
     <Card className={`${className}`}>
-      {data ? (
+      {margeLogs && margeLogs.length > 0 ? (
         <CardMultiCharts
           targets={targets}
-          list={data}
+          margeLogs={margeLogs}
           rdsList={rdsList}
           setRdsList={setRdsList}
           title={title}
