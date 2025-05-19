@@ -42,7 +42,7 @@ function getMaxPerKey(data: IndexCardMulti[]) {
   const maxPerKey: Record<string, number> = { all: 0 };
   for (const row of data) {
     for (const key in row) {
-      if (key === "checked_at") continue;
+      if (key === "created_at") continue;
       const value = row[key as keyof typeof row];
       if (typeof value === "number") {
         const maxValue = Math.max(maxPerKey[key] ?? 0, value);
@@ -189,7 +189,7 @@ export default function CardMultiCharts({
             <CartesianGrid vertical={false} />
 
             <XAxis
-              dataKey="checked_at"
+              dataKey="created_at"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
@@ -220,7 +220,7 @@ export default function CardMultiCharts({
                 const sorted = [...payload].sort(
                   (a, b) => (b.value as number) - (a.value as number)
                 );
-                const checkedAt = payload[0]?.payload?.checked_at;
+                const checkedAt = payload[0]?.payload?.created_at;
                 const timeStr = checkedAt
                   ? new Date(checkedAt).toLocaleTimeString("ja-JP", {
                       timeZone: "Asia/Tokyo",

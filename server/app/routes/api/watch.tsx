@@ -60,7 +60,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // まとめてDBへinsert
   const insertRows = results.map(({ key, log }) => ({
     target_key: key,
-    checked_at: new Date(),
+    created_at: new Date(),
     response_time: log.responseTime,
     status_code: log.statusCode,
     status_message: log.statusMessage,

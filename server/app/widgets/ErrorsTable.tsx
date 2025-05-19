@@ -64,7 +64,7 @@ function TableList({
     const {
       target_key,
       name,
-      checked_at,
+      created_at,
       response_time,
       status_code,
       status_message,
@@ -77,11 +77,11 @@ function TableList({
       const todayStartMs = new Date().setHours(0, 0, 0, 0);
       return checkedMs < todayStartMs;
     };
-    const isBeforeToday = checkBeforeToday(checked_at);
+    const isBeforeToday = checkBeforeToday(created_at);
     return (
       <TableRow key={index} className={isBeforeToday ? "opacity-50" : ""}>
         <TableCell className="font-medium">
-          {new Date(checked_at).toLocaleTimeString("ja-JP", {
+          {new Date(created_at).toLocaleTimeString("ja-JP", {
             timeZone: "Asia/Tokyo",
             year: "numeric",
             month: "2-digit",

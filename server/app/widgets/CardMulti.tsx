@@ -22,16 +22,16 @@ function mergeTargetsData(raw: IndexCard[]) {
   const map = new Map<string, any>();
   for (const target of raw) {
     const { key, logs } = target;
-    for (const { checked_at, response_time } of logs) {
-      const timeKey = roundTo5Min(checked_at);
+    for (const { created_at, response_time } of logs) {
+      const timeKey = roundTo5Min(created_at);
       if (!map.has(timeKey)) {
-        map.set(timeKey, { checked_at: timeKey });
+        map.set(timeKey, { created_at: timeKey });
       }
       map.get(timeKey)[key] = response_time;
     }
   }
   return Array.from(map.values()).sort((a, b) =>
-    a.checked_at.localeCompare(b.checked_at)
+    a.created_at.localeCompare(b.created_at)
   );
 }
 
