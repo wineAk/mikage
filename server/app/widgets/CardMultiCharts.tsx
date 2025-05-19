@@ -65,7 +65,7 @@ export default function CardMultiCharts({
   rdsList: string[];
   setRdsList: (value: string[]) => void;
 }) {
-  const THRESHOLD = 1000;
+  const THRESHOLD = 3000;
 
   const chartConfig: ChartConfig = Object.fromEntries(
     rdsList.map((key) => [
