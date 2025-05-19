@@ -15,6 +15,16 @@ import type { LogResult } from "@/types/watch";
 import type { Database } from "@/types/supabase";
 
 export async function loader({ request }: Route.LoaderArgs) {
+  // パラメータを取得
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+  if (key !== process.env.VITE_WATCH_KEY) {
+    return new Response(JSON.stringify({ error: "Invalid key." }), {
+      status: 401,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const { supabase } = createClient(request, "mikage");
 
   // 対象取得
