@@ -28,7 +28,7 @@ app.use((req, res, next) => {
   console.log('reqIp:', reqIp);
   console.log('isAllowed:', isAllowed);
   // /api/v1/watch だけはIP制限スキップ
-  if (req.path === "/api/v1/watch") {
+  if (/\/api\/v1\/watch/.test(req.path)) {
     return next();
   }
   // 許可IP以外は403エラー
