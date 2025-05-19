@@ -59,10 +59,11 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   useEffect(() => {
     setNow(timeFormatter());
   }, []);
-  // 5で割って1余る分（1, 6, 11, ..., 56）だけ更新
+  
+  // 5分に1度更新
   useInterval(() => {
-    if (new Date().getMinutes() % 5 === 1) setNow(timeFormatter());
-  }, 60 * 1000);
+    setNow(timeFormatter());
+  }, 5 * 60 * 1000);
 
   // 表示時間
   const [minute, setMinute] = useState<string | null>(null);

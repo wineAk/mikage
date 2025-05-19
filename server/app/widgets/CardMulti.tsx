@@ -51,14 +51,14 @@ export default function CardMulti({
   const [rdsList, setRdsList] = useState<string[]>(keyNames);
   const colorLists = getColorListsFromKey(keyNames[0]);
   useEffect(() => {
+    if (!minute) return;
     // 分を計算
-    const minuteValue = minute ? minute : "60*1";
-    const minuteValueStr = minuteValue
+    const minuteValue = minute
       .split("*")
       .map(Number)
       .reduce((a, b) => a * b, 1);
     // データ取得
-    fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValueStr}`)
+    fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValue}`)
       .then((res) => res.json())
       .then((res) => {
         const keyLogs = res.data as Key[];

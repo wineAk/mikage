@@ -59,14 +59,14 @@ export default function SummaryTable({
   const [data, setData] = useState<Row[] | null>(null);
 
   useEffect(() => {
+    if (!minute) return;
     fetch(`/api/v1/targets`)
       .then((res) => res.json())
       .then((res) => {
         const targets = res.data;
         const rdsList = targets.map((target: any) => target.key);
-        const minuteValue = minute ? minute : "60*1";
-        const minuteValueStr = minuteValue.split("*").map(Number).reduce((a, b) => a * b, 1);
-        fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValueStr}`)
+        const minuteValue = minute.split("*").map(Number).reduce((a, b) => a * b, 1);
+        fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValue}`)
           .then((res) => res.json())
           .then((res) => setData(res.data));
       });
