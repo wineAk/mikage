@@ -153,7 +153,7 @@ export default function CardMultiCharts({
       <CardContent>
         <ChartContainer
           config={chartConfig}
-          className="h-32 md:h-48 xl:h-64 w-full"
+          className="h-64 w-full"
         >
           <AreaChart data={data}>
             <defs>
@@ -281,7 +281,7 @@ export default function CardMultiCharts({
               }}
             />
 
-            <ChartLegend content={<ChartLegendContent />} />
+            <ChartLegend content={<ChartLegendContent />} className="flex-wrap gap-y-0"/>
           </AreaChart>
         </ChartContainer>
       </CardContent>
