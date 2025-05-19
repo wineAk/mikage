@@ -731,28 +731,105 @@ export async function loader({ request }: Route.LoaderArgs) {
   //const anyErrors = findErrorResults(results, ["saaske", "works"]);
 
   // インシデント状況を取得
-  type Incident = Database["mikage"]["Tables"]["incident"]["Row"];
-  const { data: incidentData }: { data: Incident[] | null } = await supabase
-    .from("incident")
-    .select("*");
-  const saaskeIncident = incidentData?.find(
-    (incident) => incident.key === "saaske"
-  );
-  const worksIncident = incidentData?.find(
-    (incident) => incident.key === "works"
-  );
-  if (!saaskeIncident || !worksIncident) {
-    return new Response(JSON.stringify({ results }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  type Incidents = Database["mikage"]["Tables"]["incidents"]["Row"];
+  const { data: incidents }: { data: Incidents[] | null } = await supabase
+    .from("incidents")
+    .select("*")
+    .is("is_closed", null);
+  const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
+  const worksIncident = incidents?.find((i) => i.keyword === "works");
 
   // インシデントを更新する関数
   async function handleIncident(
     label: string,
     errors: LogResult[],
-    incident: Incident
+    incident: Incidents | undefined
   ): Promise<any> {
+    // 現在の時刻
+    const now = new Date();
+    // 結果
+    let supabaseResult, googleChatResult, instatusResult;
+
+    // エラーがある
+    if (errors.length > 0) {
+      // 1回目
+      if (!incident){
+        console.log(`${label} エラー1回目`);
+        supabaseResult = await supabase
+          .from("incidents")
+          .insert([{ keyword: label }]);
+      }
+      // 2回目以降
+      else {
+        const { id, keyword, created_at, updated_at, count, is_closed, googlechat_name, instatus_id } = incident;
+        const errorCount = count + 1;
+        console.log(`${label} エラー${errorCount}回目`);
+        // Google Chatへ通知
+        if (!googlechat_name) {
+          console.log(`${label} Google Chatへ通知`);
+          googleChatResult = await createThreadGoogleChat(errors);
+        } else {
+          console.log(`${label} Google Chatを更新`);
+          googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
+        }
+        // WorksのみInstatusへ通知（更新は5回に1回）
+        if (label === "works" && !instatus_id  && errorCount === 2 ) {
+          console.log(`${label} Instatusへ通知`);
+          const started = new Date(created_at).toISOString(); // 初回のみ作成日時を利用
+          instatusResult = await createIncidentInstatus(started);
+        } else if (label === "works" && instatus_id && errorCount % 5 === 0) {
+          console.log(`${label} Instatusを更新`);
+          const started = new Date(updated_at).toISOString(); // 2回目以降は前回更新日時を利用
+          instatusResult = await updateIncidentInstatus(instatus_id, started);
+        }
+        // Supabaseを更新
+        supabaseResult = await supabase
+          .from("incidents")
+          .update({
+            count: errorCount,
+            updated_at: now,
+            googlechat_name: googleChatResult?.thread?.name,
+            instatus_id: instatusResult?.id,
+          })
+          .eq("id", id);
+      }
+    }
+    // エラーがない
+    else {
+      // 1回目以降
+      if (incident) {
+        console.log(`${label} エラー解決`);
+        const { id, keyword, created_at, updated_at, count, is_closed, googlechat_name, instatus_id } = incident;
+        // Google Chatを終了
+        if (googlechat_name) {
+          console.log(`${label} Google Chatを終了`);
+          googleChatResult = await resolveThreadGoogleChat(errors, googlechat_name);
+        }
+        // Instatusを終了
+        if (instatus_id) {
+          console.log(`${label} Instatusを終了`);
+          const started = new Date(now).toISOString(); // 終了ときは現在の日時を利用
+          instatusResult = await resolveIncidentInstatus(instatus_id, started);
+        }
+        // Supabaseを更新
+        supabaseResult = await supabase
+          .from("incidents")
+          .update({ 
+            is_closed: true,
+            updated_at: now,
+            googlechat_name: null,
+            instatus_id: null,
+          })
+          .eq("id", id); 
+      } else {
+        console.log(`${label} 問題なし`);
+      }
+    }
+
+    // 結果を返す
+    return { supabaseResult, googleChatResult, instatusResult };
+
+    /*
     const { last_updated, googlechat_name, instatus_id } = incident;
     const now = new Date();
     // --- エラーがある場合 ---
@@ -845,18 +922,19 @@ export async function loader({ request }: Route.LoaderArgs) {
         .eq("key", label);
       return { supabaseResult, googleChatResult, instatusResult };
     }
+    */
   }
 
   // 呼び出し
   const worksResult = await handleIncident(
     "works",
     worksErrors,
-    worksIncident!
+    worksIncident
   );
   const saaskeResult = await handleIncident(
     "saaske",
     saaskeErrors,
-    saaskeIncident!
+    saaskeIncident
   );
 
   return new Response(JSON.stringify({ results, worksResult, saaskeResult }), {

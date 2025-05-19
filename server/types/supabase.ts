@@ -57,25 +57,34 @@ export type Database = {
       }
       incidents: {
         Row: {
-          count: number | null
+          count: number
           created_at: string
+          googlechat_name: string | null
           id: number
-          keyword: string | null
-          updated_at: string | null
+          instatus_id: string | null
+          is_closed: boolean | null
+          keyword: string
+          updated_at: string
         }
         Insert: {
-          count?: number | null
+          count?: number
           created_at?: string
+          googlechat_name?: string | null
           id?: number
-          keyword?: string | null
-          updated_at?: string | null
+          instatus_id?: string | null
+          is_closed?: boolean | null
+          keyword?: string
+          updated_at?: string
         }
         Update: {
-          count?: number | null
+          count?: number
           created_at?: string
+          googlechat_name?: string | null
           id?: number
-          keyword?: string | null
-          updated_at?: string | null
+          instatus_id?: string | null
+          is_closed?: boolean | null
+          keyword?: string
+          updated_at?: string
         }
         Relationships: []
       }
