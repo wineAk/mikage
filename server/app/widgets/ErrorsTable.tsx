@@ -19,10 +19,10 @@ import {
 } from "~/components/ui/table";
 import CardLoading from "./CardLoading";
 import { getColorListsFromKey } from "~/library/index/color";
-import type { apiError } from "@/types/indexCard";
+import type { Error } from "@/types/api";
 
 export default function CardTable({ className }: { className: string }) {
-  const [data, setData] = useState<apiError[] | null>(null);
+  const [data, setData] = useState<Error[] | null>(null);
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function TableList({
   onPrev,
   onNext,
 }: {
-  data: apiError[];
+  data: Error[];
   offset: number;
   onPrev: () => void;
   onNext: () => void;
@@ -72,8 +72,8 @@ function TableList({
       error_code,
     } = item;
     // 今日より前のデータか？
-    const checkBeforeToday = (checkedAt: Date) => {
-      const checkedMs = Date.parse(String(checkedAt));
+    const checkBeforeToday = (date: string) => {
+      const checkedMs = Date.parse(String(date));
       const todayStartMs = new Date().setHours(0, 0, 0, 0);
       return checkedMs < todayStartMs;
     };

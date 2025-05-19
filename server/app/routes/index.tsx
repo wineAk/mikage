@@ -1,4 +1,5 @@
 import type { Route } from "./+types/index";
+import type { Target } from "@/types/api";
 
 import {
   Select,
@@ -45,6 +46,15 @@ export async function loader({ request }: Route.LoaderArgs) {}
 export default function Index({ loaderData }: Route.ComponentProps) {
   // 更新日
   const [now, setNow] = useState("読み込み中……");
+
+  // データ取得
+  const [targets, setTargets] = useState<Target[]>([]);
+  useEffect(() => {
+    fetch("/api/v1/targets")
+      .then((res) => res.json())
+      .then((res) => setTargets(res.data));
+  }, []);
+
   // クライアントで初期化
   useEffect(() => {
     setNow(timeFormatter());
@@ -89,12 +99,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <CardMulti
           title="ホームページ"
+          targets={targets}
           keyNames={["web_interpark", "web_saaske", "web_works"]}
           minute={minute}
           now={now}
         />
         <CardMulti
           title="Works"
+          targets={targets}
           keyNames={["works07", "works09"]}
           minute={minute}
           now={now}
@@ -102,6 +114,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <CardMulti
           title="サスケ"
           className="col-span-1 md:col-span-2"
+          targets={targets}
           keyNames={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
           minute={minute}
           now={now}

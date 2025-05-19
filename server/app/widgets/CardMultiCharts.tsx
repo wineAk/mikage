@@ -1,4 +1,5 @@
-import type { IndexCardMulti } from "@/types/indexCard";
+import type { ChartProps, MargeLog } from "@/types/indexCard";
+import type { Target } from "@/types/api";
 
 import { Button } from "~/components/ui/button";
 import {
@@ -38,7 +39,7 @@ import { getColorListsFromKey } from "~/library/index/color";
  * @param data
  * @returns
  */
-function getMaxPerKey(data: IndexCardMulti[]) {
+function getMaxPerKey(data: MargeLog[]) {
   const maxPerKey: Record<string, number> = { all: 0 };
   for (const row of data) {
     for (const key in row) {
@@ -55,30 +56,33 @@ function getMaxPerKey(data: IndexCardMulti[]) {
 }
 
 export default function CardMultiCharts({
+  targets,
   title,
-  data,
+  list,
   rdsList,
   setRdsList,
 }: {
+  targets: Target[];
   title: string;
-  data: IndexCardMulti[];
+  list: ChartProps;
   rdsList: string[];
   setRdsList: (value: string[]) => void;
 }) {
+  const { margeLogs } = list;
   const THRESHOLD = 3000;
 
   const chartConfig: ChartConfig = Object.fromEntries(
     rdsList.map((key) => [
       key,
       {
-        label: key,
+        label: targets.find((target) => target.key === key)?.name ?? key,
         color: getColorListsFromKey(key).oklch,
       },
     ])
   );
 
   const targetKeys = Object.keys(chartConfig);
-  const maxPerKey = getMaxPerKey(data);
+  const maxPerKey = getMaxPerKey(margeLogs);
   const rawMax = maxPerKey.all;
   const unit = rawMax < 1000 ? 100 : 500;
   const yAxisMax = Math.ceil(rawMax / unit) * unit;
@@ -99,21 +103,8 @@ export default function CardMultiCharts({
                 <DialogTitle>表示させる環境の設定</DialogTitle>
               </DialogHeader>
               <div className="grid grid-cols-2 gap-2 p-2">
-                {[
-                  "saaske00",
-                  "saaske01",
-                  "saaske02",
-                  "saaske03",
-                  "saaske04",
-                  "saaske05",
-                  "saaske06",
-                  "saaske07",
-                  "saaske08",
-                  "saaske09",
-                  "saaske_api",
-                  "saaske_webform",
-                  "saaske_webtracking",
-                ].map((key) => {
+                {targets.map(({key, name}) => {
+                  if (!/^saaske/.test(key)) return null;
                   const isChecked = rdsList.includes(key);
                   return (
                     <div className="flex items-center space-x-2" key={key}>
@@ -131,7 +122,7 @@ export default function CardMultiCharts({
                         className="cursor-pointer"
                       />
                       <Label htmlFor={key} className="cursor-pointer">
-                        {key}
+                        {name}
                       </Label>
                     </div>
                   );
@@ -155,7 +146,7 @@ export default function CardMultiCharts({
           config={chartConfig}
           className="h-64 w-full"
         >
-          <AreaChart data={data}>
+          <AreaChart data={margeLogs}>
             <defs>
               {targetKeys.map((key) => {
                 const max = maxPerKey[key] ?? 0;

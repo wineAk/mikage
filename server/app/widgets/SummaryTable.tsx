@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { DataLog } from "@/types/indexCard";
+import type { KeyLog } from "@/types/api";
 import {
   Card,
   CardContent,
@@ -23,19 +23,19 @@ import { getColorListsFromKey } from "~/library/index/color";
 type Row = {
   key: string;
   name: string;
-  logs: DataLog[];
+  logs: KeyLog[];
 };
 
 type Stats = { max: number; min: number; avg: number; median: number };
 
-function calcStatsFromLogs(logs: DataLog[]): Stats {
+function calcStatsFromLogs(logs: KeyLog[]): Stats {
   if (!logs || logs.length === 0) return { max: 0, min: 0, avg: 0, median: 0 };
-  const values = logs.map((log) => log.response_time);
+  const values = logs.map((log) => log.response_time).filter((v): v is number => v !== null);
   const sorted = [...values].sort((a, b) => a - b);
   const max = Math.max(...values);
   const min = Math.min(...values);
-  const avg = values.reduce((a, b) => a + b, 0) / values.length;
-  const median = sorted[Math.floor(sorted.length / 2)];
+  const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const median = values.length ? sorted[Math.floor(sorted.length / 2)] : 0;
   return { max, min, avg, median };
 }
 
