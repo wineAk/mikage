@@ -55,8 +55,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   }, 60 * 1000);
 
   // 表示時間
-  const [hour, setHour] = useState<string | null>(null);
-  useEffect(() => setHour("1"), []);
+  const [minute, setMinute] = useState<string | null>(null);
+  useEffect(() => setMinute("60*1"), []);
 
   return (
     <main className="flex flex-col gap-4 p-4">
@@ -65,22 +65,24 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           <span className="block sm:inline mr-2">更新日</span>
           <span>{now}</span>
         </div>
-        <Select value={hour ?? ""} onValueChange={(value) => setHour(value)}>
+        <Select value={minute ?? ""} onValueChange={(value) => setMinute(value)}>
           <SelectTrigger className="w-24 cursor-pointer bg-white">
             <SelectValue
-              placeholder={hour === null ? "読み込み中……" : undefined}
+              placeholder={minute === null ? "読み込み中……" : undefined}
             />
           </SelectTrigger>
           <SelectContent align="end">
-            <SelectItem value="1" className="cursor-pointer">1時間</SelectItem>
-            <SelectItem value="3" className="cursor-pointer">3時間</SelectItem>
-            <SelectItem value="6" className="cursor-pointer">6時間</SelectItem>
-            <SelectItem value="12" className="cursor-pointer">12時間</SelectItem>
-            <SelectItem value="24" className="cursor-pointer">24時間</SelectItem>
-            <SelectItem value="72" className="cursor-pointer">3日間</SelectItem>
-            <SelectItem value="168" className="cursor-pointer">7日間</SelectItem>
-            <SelectItem value="336" className="cursor-pointer">14日間</SelectItem>
-            <SelectItem value="672" className="cursor-pointer">28日間</SelectItem>
+            <SelectItem value="10" className="cursor-pointer">10分間</SelectItem>
+            <SelectItem value="30" className="cursor-pointer">30分間</SelectItem>
+            <SelectItem value="60*1" className="cursor-pointer">1時間</SelectItem>
+            <SelectItem value="60*3" className="cursor-pointer">3時間</SelectItem>
+            <SelectItem value="60*6" className="cursor-pointer">6時間</SelectItem>
+            <SelectItem value="60*12" className="cursor-pointer">12時間</SelectItem>
+            <SelectItem value="60*24" className="cursor-pointer">24時間</SelectItem>
+            <SelectItem value="60*24*3" className="cursor-pointer">3日間</SelectItem>
+            <SelectItem value="60*24*7" className="cursor-pointer">7日間</SelectItem>
+            <SelectItem value="60*24*14" className="cursor-pointer">14日間</SelectItem>
+            <SelectItem value="60*24*28" className="cursor-pointer">28日間</SelectItem>
           </SelectContent>
         </Select>
       </section>
@@ -88,25 +90,25 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <CardMulti
           title="ホームページ"
           keyNames={["web_interpark", "web_saaske", "web_works"]}
-          hour={hour}
+          minute={minute}
           now={now}
         />
         <CardMulti
           title="Works"
           keyNames={["works07", "works09"]}
-          hour={hour}
+          minute={minute}
           now={now}
         />
         <CardMulti
           title="サスケ"
           className="col-span-1 md:col-span-2"
           keyNames={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
-          hour={hour}
+          minute={minute}
           now={now}
         />
       </section>
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <SummaryTable className="col-span-1" hour={hour} />
+        <SummaryTable className="col-span-1" minute={minute} />
         <ErrorsTable className="col-span-1" />
       </section>
       <section className="grid grid-cols-1 gap-4">

@@ -3,14 +3,14 @@ import { createClient } from "~/library/supabase/server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // パラメータを取得
-  const { keys: keysParam, hour: hourParam } = params;
+  const { keys: keysParam, minute: minuteParam } = params;
   const keys = keysParam.split(",");
-  const hour = /^\d+$/.test(hourParam) ? Number(hourParam) : 1;
+  const minute = /^\d+$/.test(minuteParam) ? Number(minuteParam) : 1;
 
   // 現在 から 指定時間 までの絞り込み
   const now = new Date();
   const end = now.toISOString();
-  const start = new Date(now.getTime() - hour * 60 * 60 * 1000).toISOString();
+  const start = new Date(now.getTime() - minute * 60 * 1000).toISOString();
 
   // データ取得
   const { supabase } = createClient(request, "mikage");

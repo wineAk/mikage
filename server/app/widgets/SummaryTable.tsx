@@ -51,10 +51,10 @@ function msToSecStr(ms: number) {
 
 export default function SummaryTable({
   className,
-  hour,
+  minute,
 }: {
   className: string;
-  hour: string | null;
+  minute: string | null;
 }) {
   const [data, setData] = useState<Row[] | null>(null);
 
@@ -64,11 +64,13 @@ export default function SummaryTable({
       .then((res) => {
         const targets = res.data;
         const rdsList = targets.map((target: any) => target.key);
-        fetch(`/api/v1/keys/${rdsList.join(",")}/hour/${hour}`)
+        const minuteValue = minute ? minute : "60*1";
+        const minuteValueStr = minuteValue.split("*").map(Number).reduce((a, b) => a * b, 1);
+        fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValueStr}`)
           .then((res) => res.json())
           .then((res) => setData(res.data));
       });
-  }, [hour]);
+  }, [minute]);
 
   return (
     <Card className={`${className}`}>

@@ -39,14 +39,14 @@ type CardMultiProps = {
   title: string;
   className?: string;
   keyNames: string[];
-  hour: string | null;
+  minute: string | null;
   now: string;
 };
 
 export default function CardMulti({
   title,
   keyNames,
-  hour,
+  minute,
   className,
   now,
 }: CardMultiProps) {
@@ -54,14 +54,16 @@ export default function CardMulti({
   const [rdsList, setRdsList] = useState<string[]>(keyNames);
   const colorLists = getColorListsFromKey(keyNames[0]);
   useEffect(() => {
-    fetch(`/api/v1/keys/${rdsList.join(",")}/hour/${hour}`)
+    const minuteValue = minute ? minute : "60*1";
+    const minuteValueStr = minuteValue.split("*").map(Number).reduce((a, b) => a * b, 1);
+    fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValueStr}`)
       .then((res) => res.json())
       .then((res) => {
         const rawData = res.data;        
         const mergeData = mergeTargetsData(rawData);
         setData(mergeData);
       });
-  }, [now, hour, rdsList]);
+  }, [now, minute, rdsList]);
 
   return (
     <Card className={`${className}`}>
