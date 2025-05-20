@@ -116,10 +116,14 @@ function injectLockOverlay(html: string, baseHref: string) {
 // /:key にアクセスされたときのプロキシ処理
 app.get("/:key", async (req, res, next) => {
   const key = req.params.key;
+  console.log('key:', key);
   if (typeof key !== "string") return res.redirect("/");
-
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const fullUrl = new URL(key, baseUrl).toString();
+  console.log('baseUrl:', baseUrl);
+  console.log('fullUrl:', fullUrl);
   try {
-    const fetchRequest = new Request(req.url, {
+    const fetchRequest = new Request(fullUrl, {
       method: req.method,
       headers: new Headers(
         Object.entries(req.headers).map(
