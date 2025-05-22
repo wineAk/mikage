@@ -84,22 +84,19 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       <Tabs defaultValue="status" className="">
         <TabsList>
           <TabsTrigger value="status" className="cursor-pointer">Status</TabsTrigger>
-          <TabsTrigger value="errors" className="cursor-pointer">Errors</TabsTrigger>
           <TabsTrigger value="incidents" className="cursor-pointer">Incidents</TabsTrigger>
+          <TabsTrigger value="errors" className="cursor-pointer">Errors</TabsTrigger>
           <TabsTrigger value="login" className="cursor-pointer">Login</TabsTrigger>
         </TabsList>
         <TabsContent value="status">
           <Status now={now} minute={minute} setMinute={setMinute} logs={logs} targets={targets} />
         </TabsContent>
-        <TabsContent value="errors">
-          <ErrorsTable className="col-span-1" />
-        </TabsContent>
         <TabsContent value="incidents"></TabsContent>
+        <TabsContent value="errors">
+          <ErrorsTable />
+        </TabsContent>
         <TabsContent value="login">
-          <CardLogin
-            className="col-span-1 md:col-span-2 xl:col-span-4"
-            targets={targets}
-          />
+          <CardLogin targets={targets} />
         </TabsContent>
       </Tabs>
     </main>

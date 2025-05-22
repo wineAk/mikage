@@ -23,7 +23,7 @@ import { useState } from "react";
 import { getColorListsFromKey } from "~/library/index/color";
 
 type CardLoginProps = {
-  className: string;
+  className?: string;
   targets: Target[];
 }
 

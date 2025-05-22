@@ -21,7 +21,11 @@ import CardLoading from "./CardLoading";
 import { getColorListsFromKey } from "~/library/index/color";
 import type { Error } from "@/types/api";
 
-export default function CardTable({ className }: { className: string }) {
+type ErrorsTableProps = {
+  className?: string;
+}
+
+export default function ErrorsTable({ className }: ErrorsTableProps) {
   const [data, setData] = useState<Error[] | null>(null);
   const [offset, setOffset] = useState(0);
 
