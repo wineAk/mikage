@@ -16,6 +16,17 @@ export type Error = {
   error_name: string | null;
 }
 
+// api/incidents.tsx
+export type Incident = {
+  keyword: string;
+  created_at: string;
+  updated_at: string;
+  count: number;
+  is_closed: boolean;
+  googlechat_name: string | null;
+  instatus_id: string | null;
+}
+
 // api/index.tsx
 export type Index = {
   data: [];
