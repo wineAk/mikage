@@ -19,10 +19,15 @@ import {
   DialogClose,
 } from "~/components/ui/dialog";
 import { Sun, Moon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getColorListsFromKey } from "~/library/index/color";
 
-export default function CardLogin({ className, targets }: { className: string, targets: Target[] }) {
+type CardLoginProps = {
+  className: string;
+  targets: Target[];
+}
+
+export default function CardLogin({ className, targets }: CardLoginProps) {
   return (
     <Card className={`${className}`}>
       {targets && targets.length > 0 ? (

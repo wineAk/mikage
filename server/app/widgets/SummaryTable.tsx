@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { KeyLog } from "@/types/api";
+import type { KeyLog, Key } from "@/types/api";
 import {
   Card,
   CardContent,
@@ -7,7 +7,7 @@ import {
   CardTitle,
   CardFooter,
 } from "~/components/ui/card";
-import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area"
+import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -30,11 +30,15 @@ type Stats = { max: number; min: number; avg: number; median: number };
 
 function calcStatsFromLogs(logs: KeyLog[]): Stats {
   if (!logs || logs.length === 0) return { max: 0, min: 0, avg: 0, median: 0 };
-  const values = logs.map((log) => log.response_time).filter((v): v is number => v !== null);
+  const values = logs
+    .map((log) => log.response_time)
+    .filter((v): v is number => v !== null);
   const sorted = [...values].sort((a, b) => a - b);
   const max = Math.max(...values);
   const min = Math.min(...values);
-  const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const avg = values.length
+    ? values.reduce((a, b) => a + b, 0) / values.length
+    : 0;
   const median = values.length ? sorted[Math.floor(sorted.length / 2)] : 0;
   return { max, min, avg, median };
 }
@@ -49,32 +53,15 @@ function msToSecStr(ms: number) {
   return (ms / 1000).toFixed(2) + " 秒";
 }
 
-export default function SummaryTable({
-  className,
-  minute,
-}: {
+type SummaryTableProps = {
   className: string;
-  minute: string | null;
-}) {
-  const [data, setData] = useState<Row[] | null>(null);
+  logs: Key[];
+}
 
-  useEffect(() => {
-    if (!minute) return;
-    fetch(`/api/v1/targets`)
-      .then((res) => res.json())
-      .then((res) => {
-        const targets = res.data;
-        const rdsList = targets.map((target: any) => target.key);
-        const minuteValue = minute.split("*").map(Number).reduce((a, b) => a * b, 1);
-        fetch(`/api/v1/keys/${rdsList.join(",")}/minute/${minuteValue}`)
-          .then((res) => res.json())
-          .then((res) => setData(res.data));
-      });
-  }, [minute]);
-
+export default function SummaryTable({className, logs}: SummaryTableProps) {
   return (
     <Card className={`${className}`}>
-      {data ? (
+      {logs && logs.length > 0 ? (
         <>
           <CardHeader>
             <CardTitle className="flex items-center justify-between h-8">
@@ -95,7 +82,7 @@ export default function SummaryTable({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.map((row) => {
+                  {logs.map((row) => {
                     const { key, name, logs } = row;
                     const stats = calcStatsFromLogs(logs);
                     const bgColor = getColorListsFromKey(key).bg;

@@ -1,4 +1,4 @@
-import type { ChartProps, MargeLog } from "@/types/indexCard";
+import type { MargeLog } from "@/types/indexCard";
 import type { Target } from "@/types/api";
 
 import { Button } from "~/components/ui/button";
@@ -34,11 +34,6 @@ import {
 } from "recharts";
 import { getColorListsFromKey } from "~/library/index/color";
 
-/**
- *
- * @param data
- * @returns
- */
 function getMaxPerKey(data: MargeLog[]) {
   const maxPerKey: Record<string, number> = { all: 0 };
   for (const row of data) {
