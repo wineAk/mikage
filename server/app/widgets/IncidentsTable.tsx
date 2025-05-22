@@ -226,9 +226,11 @@ function Timeline({
                         value={`item-${index}`}
                         className="border border-b-0 last:border-b first:rounded-t-md last:rounded-b-md"
                       >
-                        <AccordionTrigger className="cursor-pointer px-4">
+                        <AccordionTrigger className="cursor-pointer px-4 hover:no-underline">
                           <div className="flex items-center gap-2">
-                            <Badge className={`${bgColor} ${textColor}`}>{errorList.length}件</Badge>
+                            <Badge className={`${bgColor} ${textColor}`}>
+                              {errorList.length}件
+                            </Badge>
                             {target_name}
                           </div>
                         </AccordionTrigger>
