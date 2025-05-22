@@ -27,7 +27,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .select("keyword, created_at, updated_at, count, is_closed, googlechat_name, instatus_id")
     .gte("created_at", startIso)
     .lt("created_at", endIso)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: true });
 
   return new Response(JSON.stringify({ data, error }), {
     headers: { "Content-Type": "application/json" },

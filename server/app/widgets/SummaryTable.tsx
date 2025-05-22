@@ -70,7 +70,7 @@ export default function SummaryTable({className, logs}: SummaryTableProps) {
           </CardHeader>
 
           <CardContent>
-            <ScrollArea className="h-[460px] relative pb-2 pr-2">
+            <ScrollArea className="relative pb-2 pr-2">
               <table className="w-full caption-bottom text-sm">
                 <TableHeader className="sticky top-0 z-1 bg-white">
                   <TableRow>

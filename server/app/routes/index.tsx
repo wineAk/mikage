@@ -15,6 +15,8 @@ import CardMulti from "~/widgets/CardMulti";
 import ErrorsTable from "~/widgets/ErrorsTable";
 import SummaryTable from "~/widgets/SummaryTable";
 import CardLogin from "~/widgets/CardLogin";
+import IncidentsTable from "~/widgets/IncidentsTable";
+
 import { useInterval } from "~/library/index/useInterval";
 
 import { useState, useEffect } from "react";
@@ -91,7 +93,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <TabsContent value="status">
           <Status now={now} minute={minute} setMinute={setMinute} logs={logs} targets={targets} />
         </TabsContent>
-        <TabsContent value="incidents"></TabsContent>
+        <TabsContent value="incidents">
+          <IncidentsTable />
+        </TabsContent>
         <TabsContent value="errors">
           <ErrorsTable />
         </TabsContent>

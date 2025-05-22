@@ -726,18 +726,6 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
     return filtered;
   }
-  const saaskeErrors = findErrorResults(results, "saaske");
-  const worksErrors = findErrorResults(results, "works");
-  //const anyErrors = findErrorResults(results, ["saaske", "works"]);
-
-  // インシデント状況を取得
-  type Incidents = Database["mikage"]["Tables"]["incidents"]["Row"];
-  const { data: incidents }: { data: Incidents[] | null } = await supabase
-    .from("incidents")
-    .select("*")
-    .is("is_closed", null);
-  const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
-  const worksIncident = incidents?.find((i) => i.keyword === "works");
 
   // インシデントを更新する関数
   async function handleIncident(
@@ -828,6 +816,22 @@ export async function loader({ request }: Route.LoaderArgs) {
     return { supabaseResult, googleChatResult, instatusResult };
   }
 
+  // インシデント状況を取得
+  type Incidents = Database["mikage"]["Tables"]["incidents"]["Row"];
+  const { data: incidents }: { data: Incidents[] | null } = await supabase
+    .from("incidents")
+    .select("*")
+    .is("is_closed", null);
+
+  const saaskeErrors = findErrorResults(results, "saaske");
+  const worksErrors = findErrorResults(results, "works");
+  const webErrors = findErrorResults(results, "web");
+  //const anyErrors = findErrorResults(results, ["saaske", "works"]);
+
+  const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
+  const worksIncident = incidents?.find((i) => i.keyword === "works");
+  const webIncident = incidents?.find((i) => i.keyword === "web");
+  
   // 呼び出し
   const worksResult = await handleIncident(
     "works",
@@ -839,8 +843,13 @@ export async function loader({ request }: Route.LoaderArgs) {
     saaskeErrors,
     saaskeIncident
   );
+  const webResult = await handleIncident(
+    "web",
+    webErrors,
+    webIncident
+  );
 
-  return new Response(JSON.stringify({ results, worksResult, saaskeResult }), {
+  return new Response(JSON.stringify({ results, worksResult, saaskeResult, webResult }), {
     headers: { "Content-Type": "application/json" },
   });
 }
