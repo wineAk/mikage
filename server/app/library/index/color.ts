@@ -64,11 +64,39 @@ export const colorList = {
     oklch: "var(--color-lime-900)",
   },
   saaske_api: {
-    bg: "bg-blue-300",
-    hoverBg: "hover:bg-blue-300/80",
-    border: "border-blue-300",
+    bg: "bg-blue-200",
+    hoverBg: "hover:bg-blue-200/80",
+    border: "border-blue-200",
     text: "text-black",
-    oklch: "var(--color-blue-300)",
+    oklch: "var(--color-blue-200)",
+  },
+  saaske_webform: {
+    bg: "bg-violet-200",
+    hoverBg: "hover:bg-violet-200/80",
+    border: "border-violet-200",
+    text: "text-black",
+    oklch: "var(--color-violet-200)",
+  },
+  saaske_webtracking: {
+    bg: "bg-orange-200",
+    hoverBg: "hover:bg-orange-200/80",
+    border: "border-orange-200",
+    text: "text-black",
+    oklch: "var(--color-orange-200)",
+  },
+  saaske_broad_ap: {
+    bg: "bg-purple-200",
+    hoverBg: "hover:bg-purple-200/80",
+    border: "border-purple-200",
+    text: "text-black",
+    oklch: "var(--color-purple-200)",
+  },
+  saaske_sfc: {
+    bg: "bg-purple-300",
+    hoverBg: "hover:bg-purple-300/80",
+    border: "border-purple-300",
+    text: "text-black",
+    oklch: "var(--color-purple-300)",
   },
   // Works 
   works07: {
