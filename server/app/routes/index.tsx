@@ -94,7 +94,9 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           <Status now={now} minute={minute} setMinute={setMinute} logs={logs} targets={targets} />
         </TabsContent>
         <TabsContent value="incidents">
-          <IncidentsTable />
+          <IncidentsTable 
+            targets={targets}
+          />
         </TabsContent>
         <TabsContent value="errors">
           <ErrorsTable />
