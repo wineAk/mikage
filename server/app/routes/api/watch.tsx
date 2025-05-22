@@ -817,8 +817,6 @@ export async function loader({ request }: Route.LoaderArgs) {
           .update({ 
             is_closed: true,
             updated_at: now,
-            googlechat_name: null,
-            instatus_id: null,
           })
           .eq("id", id); 
       } else {
@@ -828,101 +826,6 @@ export async function loader({ request }: Route.LoaderArgs) {
 
     // 結果を返す
     return { supabaseResult, googleChatResult, instatusResult };
-
-    /*
-    const { last_updated, googlechat_name, instatus_id } = incident;
-    const now = new Date();
-    // --- エラーがある場合 ---
-    if (errors.length > 0) {
-      // 1回目
-      if (!last_updated && !googlechat_name) {
-        console.log(`${label} エラー1回目`);
-        // upsertでlast_updatedのみ更新
-        const supabaseResult = await supabase
-          .from("incident")
-          .upsert([{ key: label, last_updated: now }], { onConflict: "key" });
-        return { supabaseResult, googleChatResult: null, instatusResult: null };
-      }
-      // 2回目
-      if (last_updated && !googlechat_name) {
-        console.log(`${label} エラー2回目`);
-        const googleChatResult = await createThreadGoogleChat(errors);
-        const started = new Date(last_updated).toISOString();
-        const instatusResult =
-          label === "works" ? await createIncidentInstatus(started) : null;
-        // 2回目はgooglechat_nameとinstatus_idをセット
-        const supabaseResult = await supabase
-          .from("incident")
-          .update({
-            googlechat_name: googleChatResult.thread.name,
-            instatus_id: instatusResult?.id,
-          })
-          .eq("key", label);
-        return { supabaseResult, googleChatResult, instatusResult };
-      }
-      // 3回目以降
-      if (last_updated && googlechat_name) {
-        console.log(`${label} エラー3回目以降`);
-        const diffMin =
-          (now.getTime() - new Date(last_updated).getTime()) / 60000;
-        const googleChatResult = await updateThreadGoogleChat(
-          errors,
-          googlechat_name
-        );
-        if (label === "works" && diffMin >= 5 && instatus_id) {
-          console.log(`${label} エラー3回目以降 & 5分経過`);
-          const started = now.toISOString();
-          const instatusResult = await updateIncidentInstatus(
-            instatus_id,
-            started
-          );
-          const supabaseResult = await supabase
-            .from("incident")
-            .update({ last_updated: now })
-            .eq("key", label);
-          return { supabaseResult, googleChatResult, instatusResult };
-        }
-        return { supabaseResult: null, googleChatResult, instatusResult: null };
-      }
-    }
-    // --- エラーがない場合 ---
-    // 何もしない
-    if (!last_updated && !googlechat_name) {
-      console.log(`${label} なにもしない`);
-      return {
-        supabaseResult: null,
-        googleChatResult: null,
-        instatusResult: null,
-      };
-    }
-    // 日付だけある or 両方あるときは全て空にする
-    if (last_updated) {
-      let googleChatResult = null;
-      let instatusResult = null;
-      if (googlechat_name) {
-        console.log(`${label} 両方あるときは全て空にする`);
-        googleChatResult = await resolveThreadGoogleChat(
-          errors,
-          googlechat_name
-        );
-        if (label === "works" && instatus_id) {
-          const started = now.toISOString();
-          instatusResult = await resolveIncidentInstatus(instatus_id, started);
-        }
-      } else {
-        console.log(`${label} 日付だけあるときは全て空にする`);
-      }
-      const supabaseResult = await supabase
-        .from("incident")
-        .update({
-          last_updated: null,
-          googlechat_name: null,
-          instatus_id: null,
-        })
-        .eq("key", label);
-      return { supabaseResult, googleChatResult, instatusResult };
-    }
-    */
   }
 
   // 呼び出し
