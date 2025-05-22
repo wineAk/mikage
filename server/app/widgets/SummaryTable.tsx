@@ -55,13 +55,13 @@ function msToSecStr(ms: number) {
 
 type SummaryTableProps = {
   className: string;
-  logs: Key[];
+  logs: Key[] | null;
 }
 
 export default function SummaryTable({className, logs}: SummaryTableProps) {
   return (
     <Card className={`${className}`}>
-      {logs && logs.length > 0 ? (
+      {logs ? (
         <>
           <CardHeader>
             <CardTitle className="flex items-center justify-between h-8">

@@ -24,13 +24,13 @@ import { getColorListsFromKey } from "~/library/index/color";
 
 type CardLoginProps = {
   className?: string;
-  targets: Target[];
+  targets: Target[] | null;
 }
 
 export default function CardLogin({ className, targets }: CardLoginProps) {
   return (
     <Card className={`${className}`}>
-      {targets && targets.length > 0 ? (
+      {targets ? (
         <List targets={targets} />
       ) : (
         <CardLoading className="border-neutral-800" />

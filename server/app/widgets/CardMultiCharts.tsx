@@ -33,6 +33,7 @@ import {
   Tooltip,
 } from "recharts";
 import { getColorListsFromKey } from "~/library/index/color";
+import CardLoading from "./CardLoading";
 
 function getMaxPerKey(data: MargeLog[]) {
   const maxPerKey: Record<string, number> = { all: 0 };
@@ -66,13 +67,13 @@ export default function CardMultiCharts({
   const THRESHOLD = 3000;
 
   const chartConfig: ChartConfig = Object.fromEntries(
-    rdsList.map((key) => [
+    rdsList?.map((key) => [
       key,
       {
         label: targets.find((target) => target.key === key)?.name ?? key,
         color: getColorListsFromKey(key).oklch,
       },
-    ])
+    ]) || []
   );
 
   const targetKeys = Object.keys(chartConfig);
@@ -96,6 +97,27 @@ export default function CardMultiCharts({
               <DialogHeader>
                 <DialogTitle>表示させる環境の設定</DialogTitle>
               </DialogHeader>
+              <div className="flex gap-2 mb-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRdsList(
+                    targets
+                      .filter(({key}) => /^saaske/.test(key))
+                      .map(t => t.key)
+                      .sort()
+                  )}
+                >
+                  全選択
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setRdsList([])}
+                >
+                  全解除
+                </Button>
+              </div>
               <div className="grid grid-cols-2 gap-2 p-2">
                 {targets.map(({key, name}) => {
                   if (!/^saaske/.test(key)) return null;
@@ -112,7 +134,6 @@ export default function CardMultiCharts({
                             setRdsList([...rdsList, key].sort());
                           }
                         }}
-                        disabled={/saaske(0[68]|10)/.test(key)}
                         className="cursor-pointer"
                       />
                       <Label htmlFor={key} className="cursor-pointer">

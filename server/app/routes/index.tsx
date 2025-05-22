@@ -59,16 +59,16 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   }, 5 * 60 * 1000);
 
   // データ取得
-  const [targets, setTargets] = useState<Target[]>([]);
+  const [targets, setTargets] = useState<Target[] | null>(null);
   useEffect(() => {
     fetch("/api/v1/targets")
       .then((res) => res.json())
       .then((res) => setTargets(res.data));
   }, []);
 
-  const [logs, setLogs] = useState<Key[]>([]);
+  const [logs, setLogs] = useState<Key[] | null>(null);
   useEffect(() => {
-    if (!now || !minute || targets.length === 0) return;
+    if (!now || !minute || !targets) return;
     const targetKeys = targets.map((target) => target.key);
     const minuteValue = minute
       .split("*")
@@ -80,6 +80,8 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         setLogs(res.data);
       });
   }, [now, minute, targets]);
+
+  
 
   return (
     <main className="flex flex-col gap-4 p-4">
@@ -113,8 +115,8 @@ type StatusProps = {
   now: string;
   minute: string | null;
   setMinute: (value: string) => void;
-  logs: Key[];
-  targets: Target[];
+  logs: Key[] | null;
+  targets: Target[] | null;
 }
 
 function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
@@ -177,26 +179,20 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
         title="ホームページ"
         logs={logs}
         targets={targets}
-        keyNames={["web_interpark", "web_saaske", "web_works"]}
+        defaultRdsList={["web_interpark", "web_saaske", "web_works"]}
       />
       <CardMulti
         title="Works"
         logs={logs}
         targets={targets}
-        keyNames={["works07", "works09"]}
+        defaultRdsList={["works07", "works09"]}
       />
       <CardMulti
         title="サスケ"
         className="col-span-1 md:col-span-2"
         logs={logs}
         targets={targets}
-        keyNames={[
-          "saaske02",
-          "saaske04",
-          "saaske07",
-          "saaske09",
-          "saaske_api",
-        ]}
+        defaultRdsList={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
       />
       <SummaryTable className="col-span-1 md:col-span-2 xl:col-span-4" logs={logs} />
     </section>

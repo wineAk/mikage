@@ -32,25 +32,25 @@ function mergeLogs(keys: string[], logs: Key[]): MargeLog[] {
 type CardMultiProps = {
   title: string;
   className?: string;
-  logs: Key[];
-  targets: Target[];
-  keyNames: string[];
+  logs: Key[] | null;
+  targets: Target[] | null;
+  defaultRdsList: string[];
 };
 
 export default function CardMulti({
   title,
+  className,
   logs,
   targets,
-  keyNames,
-  className,
+  defaultRdsList,
 }: CardMultiProps) {  
-  const [rdsList, setRdsList] = useState<string[]>(keyNames);
-  const margeLogs = mergeLogs(rdsList, logs);
-  const colorLists = getColorListsFromKey(keyNames[0]);
+  const [rdsList, setRdsList] = useState<string[]>(defaultRdsList);
+  const colorLists = getColorListsFromKey(defaultRdsList[0]);
+  const margeLogs = logs ? mergeLogs(rdsList, logs) : null;
 
   return (
     <Card className={`${className}`}>
-      {margeLogs && margeLogs.length > 0 ? (
+      {margeLogs && targets ? (
         <CardMultiCharts
           targets={targets}
           margeLogs={margeLogs}

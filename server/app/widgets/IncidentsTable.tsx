@@ -32,7 +32,7 @@ import { getColorListsFromKey } from "~/library/index/color";
 
 type IncidentsTableProps = {
   className?: string;
-  targets: Target[];
+  targets: Target[] | null;
 };
 
 type IncidentError = Incident & {
@@ -85,7 +85,7 @@ export default function IncidentsTable({
 
   return (
     <Card className={`${className}`}>
-      {incidentsErrors ? (
+      {incidentsErrors && targets ? (
         <TableList
           incidentsErrors={incidentsErrors}
           targets={targets}
