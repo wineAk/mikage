@@ -745,7 +745,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         console.log(`${label} エラー1回目`);
         supabaseResult = await supabase
           .from("incidents")
-          .insert([{ keyword: label }]);
+          .insert([{ keyword: label, created_at: now, updated_at: now }]);
       }
       // 2回目以降
       else {
@@ -831,7 +831,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
   const worksIncident = incidents?.find((i) => i.keyword === "works");
   const webIncident = incidents?.find((i) => i.keyword === "web");
-  
+
   // 呼び出し
   const worksResult = await handleIncident(
     "works",
