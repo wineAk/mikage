@@ -268,11 +268,11 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
                               {target_name}
                             </div>
                           </AccordionTrigger>
-                          <AccordionContent>
+                          <AccordionContent className="p-0">
                             {errorList.map((error, i) => (
                               <div
                                 key={i}
-                                className="px-4 pt-4 space-y-2 border-t-1 border-neutral-200"
+                                className="p-4 space-y-2 border-t-1 border-neutral-200"
                               >
                                 <div>
                                   {new Date(
