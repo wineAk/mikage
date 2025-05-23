@@ -272,7 +272,7 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
                             {errorList.map((error, i) => (
                               <div
                                 key={i}
-                                className="px-4 py-2 space-y-2 border-t-1 border-neutral-200"
+                                className="px-4 pt-4 space-y-2 border-t-1 border-neutral-200"
                               >
                                 <div>
                                   {new Date(
