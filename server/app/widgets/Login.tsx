@@ -95,7 +95,7 @@ function List({ targets }: { targets: Target[] }) {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="absolute top-4 left-4 z-10 cursor-pointer"
+                      className="absolute top-4 left-4 cursor-pointer"
                       onClick={() => setIsDarkMode(!isDarkMode)}
                     >
                       {isDarkMode ? (

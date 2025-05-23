@@ -1,8 +1,6 @@
 import type { Route } from "./+types/index";
 import type { Key, Target } from "@/types/api";
-
-import { useState, useEffect } from "react";
-
+import { useState, useEffect, useCallback } from "react";
 import {
   Select,
   SelectContent,
@@ -11,23 +9,22 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-
 import CardMulti from "~/widgets/CardMulti";
 import ErrorsTable from "~/widgets/ErrorsTable";
 import SummaryTable from "~/widgets/SummaryTable";
 import Login from "~/widgets/Login";
 import IncidentsTable from "~/widgets/IncidentsTable";
-
 import { useInterval } from "~/library/index/useInterval";
 
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "サスケ 監視ツール - ミカゲ" },
-    { name: "description", content: "サスケを監視するツール“ミカゲ”です。" },
+    { name: "description", content: 'サスケを監視するツール"ミカゲ"です。' },
   ];
 }
 
-function timeFormatter(str?: string) {
+// 日時をフォーマットする共通関数
+function formatDateTime(str?: string) {
   const date = str ? new Date(str) : new Date();
   return date.toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
@@ -39,51 +36,61 @@ function timeFormatter(str?: string) {
   });
 }
 
+// 分数文字列（例: "60*3"）を数値に変換
+function parseMinuteString(minute: string | null): number {
+  if (!minute) return 0;
+  return minute
+    .split("*")
+    .map(Number)
+    .reduce((a, b) => a * b, 1);
+}
+
 export async function loader({ request }: Route.LoaderArgs) {}
 
 export default function Index({ loaderData }: Route.ComponentProps) {
-  // 表示時間
-  const [minute, setMinute] = useState<string | null>(null);
-  useEffect(() => setMinute("60*1"), []);
-
-  // 更新日
-  const [now, setNow] = useState("読み込み中……");
-  // クライアントで初期化
-  useEffect(() => {
-    setNow(timeFormatter());
-  }, []);
-  // 5分に1度更新
-  useInterval(() => {
-    setNow(timeFormatter());
-  }, 5 * 60 * 1000);
-
-  // データ取得
+  // 個別に管理する状態
+  const [now, setNow] = useState(formatDateTime());
+  const [minute, setMinute] = useState("60*1");
   const [targets, setTargets] = useState<Target[] | null>(null);
+  const [logs, setLogs] = useState<Key[] | null>(null);
+
+  // 時間・ターゲット・ログの一括更新
+  const updateNow = useCallback(() => {
+    setNow(formatDateTime());
+  }, []);
+
+  // targets取得
   useEffect(() => {
+    // targets取得
     fetch("/api/v1/targets")
       .then((res) => res.json())
-      .then((res) => setTargets(res.data));
-  }, []);
-
-  const [logs, setLogs] = useState<Key[] | null>(null);
-  useEffect(() => {
-    if (!now || !minute || !targets) return;
-    const targetKeys = targets.map((target) => target.key);
-    const minuteValue = minute
-      .split("*")
-      .map(Number)
-      .reduce((a, b) => a * b, 1);
-    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
-      .then((res) => res.json())
       .then((res) => {
-        setLogs(res.data);
+        const targets = res.data;
+        setTargets(targets);
+
+        // targets取得後にlogsも取得
+        if (now && minute && targets) {
+          const targetKeys = targets.map((target: Target) => target.key);
+          const minuteValue = parseMinuteString(minute);
+          fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
+            .then((res) => res.json())
+            .then((res) => setLogs(res.data));
+        }
       });
-  }, [now, minute, targets]);
+  }, [now, minute]);
+
+  // 5分ごとにnowを更新
+  useInterval(updateNow, 5 * 60 * 1000);
+
+  // minute変更ハンドラ
+  const handleMinuteChange = (value: string) => {
+    setMinute(value);
+  };
 
   return (
     <main className="flex flex-col gap-4 p-4">
       <Tabs defaultValue="status" className="">
-        <div className="fixed z-10 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
+        <div className="fixed z-100 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
           <TabsList className="w-full h-full bg-transparent p-0">
             {["status", "incidents", "errors", "login"].map((tab) => (
               <TabsTrigger
@@ -104,7 +111,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
             <Status
               now={now}
               minute={minute}
-              setMinute={setMinute}
+              setMinute={handleMinuteChange}
               logs={logs}
               targets={targets}
             />
@@ -124,9 +131,10 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   );
 }
 
+// StatusProps型
 type StatusProps = {
   now: string;
-  minute: string | null;
+  minute: string;
   setMinute: (value: string) => void;
   logs: Key[] | null;
   targets: Target[] | null;
@@ -141,10 +149,7 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
             <span className="block sm:inline mr-2">更新日</span>
             <span>{now}</span>
           </div>
-          <Select
-            value={minute ?? ""}
-            onValueChange={(value) => setMinute(value)}
-          >
+          <Select value={minute} onValueChange={setMinute}>
             <SelectTrigger className="w-24 cursor-pointer bg-white">
               <SelectValue
                 placeholder={minute === null ? "読み込み中……" : undefined}

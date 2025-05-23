@@ -153,7 +153,7 @@ function TableList({ data }: TableListProps) {
     <CardContent>
       <ScrollArea className=" relative pb-2 pr-2">
         <table className="w-full caption-bottom text-sm">
-          <TableHeader className="sticky top-0 z-10 bg-white">
+          <TableHeader className="sticky top-0 z-1 bg-white">
             <TableRow>
               <TableHead>日時</TableHead>
               <TableHead>環境</TableHead>

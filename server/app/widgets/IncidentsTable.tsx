@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { KeyLog, Key, Error, Incident, Target } from "@/types/api";
+import type { Error, Incident, Target } from "@/types/api";
 
 import {
   Accordion,
@@ -14,17 +14,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "~/components/ui/card";
-import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
 import { Calendar, Check, Clock, Flame } from "lucide-react";
 
 import SpinnerCircleLarge from "./SpinnerCircleLarge";
@@ -51,6 +41,55 @@ type TimelineItem = {
   targetNames: Record<string, string | undefined>;
 };
 
+// groupedErrorsを生成し、2件以上のエラーグループがあるか判定
+function getGroupedErrors(errors: Error[]) {
+  return errors.reduce((acc, error) => {
+    if (!acc[error.target_key]) acc[error.target_key] = [];
+    acc[error.target_key].push(error);
+    return acc;
+  }, {} as Record<string, Error[]>);
+}
+
+// 2件以上のエラーグループがあるか判定
+function hasArrayMore(groupedErrors: Record<string, Error[]>) {
+  return Object.values(groupedErrors).some(arr => arr.length >= 2);
+}
+
+// incidentとerrorsから該当エラー配列を抽出
+function getFilteredErrors(incident: Incident, errors: Error[]): Error[] {
+  const { keyword, created_at, updated_at } = incident;
+  const created_date = new Date(created_at);
+  created_date.setSeconds(0, 0);
+  const updated_date = new Date(updated_at);
+  return errors.filter((error) => {
+    const { target_key, created_at } = error;
+    if (!target_key.startsWith(keyword)) return false;
+    const error_date = new Date(created_at);
+    return error_date >= created_date && error_date <= updated_date;
+  });
+}
+
+// groupedErrorsからtargetNamesを生成
+function getTargetNames(groupedErrors: Record<string, Error[]>, targets: Target[]): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.keys(groupedErrors).map((key) => [
+      key,
+      targets.find((t) => t.key === key)?.name,
+    ])
+  );
+}
+
+// 日時をフォーマット
+function formatDateTime(date: Date): string {
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function IncidentsTable({
   className,
   targets,
@@ -59,97 +98,51 @@ export default function IncidentsTable({
   const handlePrev = () => setOffset((prev) => prev + 1);
   const handleNext = () => setOffset((prev) => Math.max(0, prev - 1));
 
-  const [incidents, setIncidents] = useState<Incident[] | null>(null);
-  useEffect(() => {
-    fetch(`/api/v1/incidents/${offset}`)
-      .then((res) => res.json())
-      .then((res) => setIncidents(res.data));
-  }, [offset]);
-
-  const [errors, setErrors] = useState<Error[] | null>(null);
-  useEffect(() => {
-    fetch(`/api/v1/errors/${offset}`)
-      .then((res) => res.json())
-      .then((res) => setErrors(res.data));
-  }, [offset]);
-
-  // incidentのデータをもとに、errorsのデータを取得する
-  const [incidentsErrors, setIncidentsErrors] = useState<
-    IncidentError[] | null
-  >(null);
-  useEffect(() => {
-    if (!incidents || !errors) return;
-    const incidentsErrors = incidents.map((incident) => {
-      const { keyword, created_at, updated_at } = incident;
-      const created_date = new Date(created_at);
-      created_date.setSeconds(0, 0);
-      const updated_date = new Date(updated_at);
-      const filtered = errors.filter((error) => {
-        const { target_key, created_at } = error;
-        // keywordで始まるtarget_keyだけ抽出
-        if (!target_key.startsWith(keyword)) return false;
-        // 日付がincidentの日付の範囲内にあるものだけ抽出
-        const error_date = new Date(created_at);
-        return error_date >= created_date && error_date <= updated_date;
-      });
-      const incidentsError = { ...incident, errors: filtered };
-      return incidentsError;
-    });
-    setIncidentsErrors(incidentsErrors);
-  }, [incidents, errors]);
-
-  // タイムライン用の配列を作成する
   const [timeline, setTimeline] = useState<TimelineItem[] | null>(null);
   useEffect(() => {
-    if (!incidentsErrors || !targets) return;
-    const timelineData = incidentsErrors.map((incidentErrors) => {
-      const { keyword, created_at, updated_at, is_closed, errors } =
-        incidentErrors;
-      const createdDateObj = new Date(created_at);
-      const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
-      const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
-      const diffMinutes = Math.ceil(diffMs / 1000 / 60);
-      const hours = Math.floor(diffMinutes / 60);
-      const minutes = diffMinutes % 60;
-      const groupedErrors = errors.reduce((acc, error) => {
-        if (!acc[error.target_key]) acc[error.target_key] = [];
-        acc[error.target_key].push(error);
+    Promise.all([
+      fetch(`/api/v1/incidents/${offset}`).then((res) => res.json()),
+      fetch(`/api/v1/errors/${offset}`).then((res) => res.json()),
+    ]).then(([incidentsRes, errorsRes]) => {
+      if (!incidentsRes.data || !errorsRes.data || !targets) return;
+      // incidentsErrors生成
+      const filteredIncidents = incidentsRes.data.reduce((acc: IncidentError[], incident: Incident) => {
+        const filtered = getFilteredErrors(incident, errorsRes.data);
+        const groupedErrors = getGroupedErrors(filtered);
+        if (hasArrayMore(groupedErrors)) {
+          acc.push({ ...incident, errors: filtered });
+        }
         return acc;
-      }, {} as Record<string, Error[]>);
-      const targetNames = Object.fromEntries(
-        Object.keys(groupedErrors).map((key) => [
-          key,
-          targets.find((t) => t.key === key)?.name,
-        ])
-      );
-      return {
-        incident: incidentErrors,
-        groupedErrors,
-        created_date: createdDateObj.toLocaleString("ja-JP", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        updated_date: updatedDateObj.toLocaleString("ja-JP", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        hours,
-        minutes,
-        is_closed: !!is_closed,
-        is_today:
-          createdDateObj.toLocaleDateString("ja-JP") ===
-          new Date().toLocaleDateString("ja-JP"),
-        targetNames,
-      };
+      }, []);
+
+      // timeline生成
+      const timelineData = filteredIncidents.map((incidentErrors: IncidentError) => {
+        const { created_at, updated_at, is_closed, errors } = incidentErrors;
+        const createdDateObj = new Date(created_at);
+        const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
+        const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
+        const diffMinutes = Math.ceil(diffMs / 1000 / 60);
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        const groupedErrors = getGroupedErrors(errors);
+        const targetNames = getTargetNames(groupedErrors, targets);
+        return {
+          incident: incidentErrors,
+          groupedErrors,
+          created_date: formatDateTime(createdDateObj),
+          updated_date: formatDateTime(updatedDateObj),
+          hours,
+          minutes,
+          is_closed: !!is_closed,
+          is_today:
+            createdDateObj.toLocaleDateString("ja-JP") ===
+            new Date().toLocaleDateString("ja-JP"),
+          targetNames,
+        };
+      });
+      setTimeline(timelineData);
     });
-    setTimeline(timelineData);
-  }, [incidentsErrors, targets]);
+  }, [offset]);
 
   return (
     <Card className={`${className}`}>
