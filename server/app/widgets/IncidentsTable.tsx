@@ -27,7 +27,7 @@ import {
 } from "~/components/ui/table";
 import { Calendar, Check, Clock, Flame } from "lucide-react";
 
-import CardLoading from "./CardLoading";
+import SpinnerCircleLarge from "./SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 type IncidentsTableProps = {
@@ -85,6 +85,11 @@ export default function IncidentsTable({
 
   return (
     <Card className={`${className}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>サーバーダウン</span>
+        </CardTitle>
+      </CardHeader>
       {incidentsErrors && targets ? (
         <TableList
           incidentsErrors={incidentsErrors}
@@ -94,7 +99,7 @@ export default function IncidentsTable({
           onNext={handleNext}
         />
       ) : (
-        <CardLoading className="border-red-800" />
+        <SpinnerCircleLarge className="border-red-800" />
       )}
     </Card>
   );
@@ -115,11 +120,6 @@ function TableList({
 }) {
   return (
     <>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>サーバーダウン</span>
-        </CardTitle>
-      </CardHeader>
       <CardContent>
         <Timeline incidentsErrors={incidentsErrors} targets={targets} />
       </CardContent>

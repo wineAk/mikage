@@ -1,6 +1,7 @@
 import type { Route } from "./+types/index";
-import type { MargeLog } from "@/types/indexCard";
 import type { Key, Target } from "@/types/api";
+
+import { useState, useEffect } from "react";
 
 import {
   Select,
@@ -14,12 +15,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import CardMulti from "~/widgets/CardMulti";
 import ErrorsTable from "~/widgets/ErrorsTable";
 import SummaryTable from "~/widgets/SummaryTable";
-import CardLogin from "~/widgets/CardLogin";
+import Login from "~/widgets/Login";
 import IncidentsTable from "~/widgets/IncidentsTable";
 
 import { useInterval } from "~/library/index/useInterval";
-
-import { useState, useEffect } from "react";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -81,8 +80,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       });
   }, [now, minute, targets]);
 
-  
-
   return (
     <main className="flex flex-col gap-4 p-4">
       <Tabs defaultValue="status" className="">
@@ -104,7 +101,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           <ErrorsTable />
         </TabsContent>
         <TabsContent value="login">
-          <CardLogin targets={targets} />
+          <Login targets={targets} />
         </TabsContent>
       </Tabs>
     </main>

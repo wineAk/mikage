@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
 import type { KeyLog, Key } from "@/types/api";
+
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardFooter,
 } from "~/components/ui/card";
 import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
 import {
@@ -17,14 +16,8 @@ import {
   TableRow,
 } from "~/components/ui/table";
 
-import CardLoading from "./CardLoading";
+import SpinnerCircleLarge from "./SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
-
-type Row = {
-  key: string;
-  name: string;
-  logs: KeyLog[];
-};
 
 type Stats = { max: number; min: number; avg: number; median: number };
 
@@ -61,14 +54,13 @@ type SummaryTableProps = {
 export default function SummaryTable({className, logs}: SummaryTableProps) {
   return (
     <Card className={`${className}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between h-8">
+          <span>サマリー</span>
+        </CardTitle>
+      </CardHeader>
       {logs ? (
         <>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between h-8">
-              <span>サマリー</span>
-            </CardTitle>
-          </CardHeader>
-
           <CardContent>
             <ScrollArea className="relative pb-2 pr-2">
               <table className="w-full caption-bottom text-sm">
@@ -116,7 +108,7 @@ export default function SummaryTable({className, logs}: SummaryTableProps) {
           </CardContent>
         </>
       ) : (
-        <CardLoading className="border-neutral-800" />
+        <SpinnerCircleLarge className="border-neutral-800" />
       )}
     </Card>
   );

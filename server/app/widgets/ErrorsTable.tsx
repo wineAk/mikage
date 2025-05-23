@@ -1,4 +1,7 @@
+import type { Error } from "@/types/api";
+
 import { useEffect, useState } from "react";
+
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -8,7 +11,7 @@ import {
   CardTitle,
   CardFooter,
 } from "~/components/ui/card";
-import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area"
+import { ScrollArea, ScrollBar } from "~/components/ui/scroll-area";
 import {
   Table,
   TableBody,
@@ -17,13 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "~/components/ui/table";
-import CardLoading from "./CardLoading";
+
+import SpinnerCircleLarge from "./SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
-import type { Error } from "@/types/api";
 
 type ErrorsTableProps = {
   className?: string;
-}
+};
 
 export default function ErrorsTable({ className }: ErrorsTableProps) {
   const [data, setData] = useState<Error[] | null>(null);
@@ -32,38 +35,59 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
   useEffect(() => {
     fetch(`/api/v1/errors/${offset}`)
       .then((res) => res.json())
-      .then((res) => setData(res.data));
+      .then((res) => {
+        const { data, error } = res;
+        if (error) {
+          setData(null);
+        } else {
+          setData(data || []);
+        }
+      });
   }, [offset]);
   const handlePrev = () => setOffset((prev) => prev + 1);
   const handleNext = () => setOffset((prev) => Math.max(0, prev - 1));
 
   return (
     <Card className={`${className}`}>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>サーバーダウン</span>
+          <div className="space-x-2 ml-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrev}
+              disabled={data?.length === 0}
+              className="cursor-pointer"
+            >
+              前へ
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNext}
+              disabled={offset === 0}
+              className="cursor-pointer"
+            >
+              次へ
+            </Button>
+          </div>
+        </CardTitle>
+      </CardHeader>
       {data ? (
-        <TableList
-          data={data}
-          offset={offset}
-          onPrev={handlePrev}
-          onNext={handleNext}
-        />
+        <TableList data={data} />
       ) : (
-        <CardLoading className="border-red-800" />
+        <SpinnerCircleLarge className="border-red-800" />
       )}
     </Card>
   );
 }
 
-function TableList({
-  data,
-  offset,
-  onPrev,
-  onNext,
-}: {
+type TableListProps = {
   data: Error[];
-  offset: number;
-  onPrev: () => void;
-  onNext: () => void;
-}) {
+};
+
+function TableList({ data }: TableListProps) {
   const tableList = data.map((item, index) => {
     const {
       target_key,
@@ -126,49 +150,22 @@ function TableList({
     );
   });
   return (
-    <>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>サーバーダウン</span>
-          <div className="space-x-2 ml-auto">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onPrev}
-              disabled={tableList.length === 0}
-              className="cursor-pointer"
-            >
-              前へ
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onNext}
-              disabled={offset === 0}
-              className="cursor-pointer"
-            >
-              次へ
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className=" relative pb-2 pr-2">
-          <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-10 bg-white">
-              <TableRow>
-                <TableHead>日時</TableHead>
-                <TableHead>環境</TableHead>
-                <TableHead>読込速度</TableHead>
-                <TableHead>ステータス</TableHead>
-                <TableHead>エラー</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>{tableList}</TableBody>
-          </table>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-      </CardContent>
-    </>
+    <CardContent>
+      <ScrollArea className=" relative pb-2 pr-2">
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader className="sticky top-0 z-10 bg-white">
+            <TableRow>
+              <TableHead>日時</TableHead>
+              <TableHead>環境</TableHead>
+              <TableHead>読込速度</TableHead>
+              <TableHead>ステータス</TableHead>
+              <TableHead>エラー</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>{tableList}</TableBody>
+        </table>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
+    </CardContent>
   );
 }
