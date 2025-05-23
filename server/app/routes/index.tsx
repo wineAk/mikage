@@ -83,26 +83,42 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   return (
     <main className="flex flex-col gap-4 p-4">
       <Tabs defaultValue="status" className="">
-        <TabsList>
-          <TabsTrigger value="status" className="cursor-pointer">Status</TabsTrigger>
-          <TabsTrigger value="incidents" className="cursor-pointer">Incidents</TabsTrigger>
-          <TabsTrigger value="errors" className="cursor-pointer">Errors</TabsTrigger>
-          <TabsTrigger value="login" className="cursor-pointer">Login</TabsTrigger>
-        </TabsList>
-        <TabsContent value="status">
-          <Status now={now} minute={minute} setMinute={setMinute} logs={logs} targets={targets} />
-        </TabsContent>
-        <TabsContent value="incidents">
-          <IncidentsTable 
-            targets={targets}
-          />
-        </TabsContent>
-        <TabsContent value="errors">
-          <ErrorsTable />
-        </TabsContent>
-        <TabsContent value="login">
-          <Login targets={targets} />
-        </TabsContent>
+        <div className="fixed z-10 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
+          <TabsList className="w-full h-full bg-transparent p-0">
+            {["status", "incidents", "errors", "login"].map((tab) => (
+              <TabsTrigger
+                key={tab}
+                value={tab}
+                className="h-full rounded-none cursor-pointer hover:bg-neutral-100/50 data-[state=active]:bg-neutral-200/50 data-[state=active]:shadow-none"
+                onClick={() => {
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                {tab}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <div className="mt-18">
+          <TabsContent value="status">
+            <Status
+              now={now}
+              minute={minute}
+              setMinute={setMinute}
+              logs={logs}
+              targets={targets}
+            />
+          </TabsContent>
+          <TabsContent value="incidents">
+            <IncidentsTable targets={targets} />
+          </TabsContent>
+          <TabsContent value="errors">
+            <ErrorsTable />
+          </TabsContent>
+          <TabsContent value="login">
+            <Login targets={targets} />
+          </TabsContent>
+        </div>
       </Tabs>
     </main>
   );
@@ -114,7 +130,7 @@ type StatusProps = {
   setMinute: (value: string) => void;
   logs: Key[] | null;
   targets: Target[] | null;
-}
+};
 
 function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
   return (
@@ -189,9 +205,18 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
         className="col-span-1 md:col-span-2"
         logs={logs}
         targets={targets}
-        defaultRdsList={["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"]}
+        defaultRdsList={[
+          "saaske02",
+          "saaske04",
+          "saaske07",
+          "saaske09",
+          "saaske_api",
+        ]}
       />
-      <SummaryTable className="col-span-1 md:col-span-2 xl:col-span-4" logs={logs} />
+      <SummaryTable
+        className="col-span-1 md:col-span-2 xl:col-span-4"
+        logs={logs}
+      />
     </section>
   );
 }
