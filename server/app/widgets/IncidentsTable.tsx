@@ -108,7 +108,7 @@ export default function IncidentsTable({
       const createdDateObj = new Date(created_at);
       const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
       const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
-      const diffMinutes = Math.floor(diffMs / 1000 / 60);
+      const diffMinutes = Math.ceil(diffMs / 1000 / 60);
       const hours = Math.floor(diffMinutes / 60);
       const minutes = diffMinutes % 60;
       const groupedErrors = errors.reduce((acc, error) => {
@@ -242,8 +242,8 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-4 w-4" />
                     <span>
-                      {hours > 0 && `${hours}時間`}
-                      {minutes + 1}分間
+                      {hours > 0 && `${hours}時間 ${minutes}分`}
+                      {hours === 0 && `${minutes}分間`}
                     </span>
                   </div>
                 </div>
