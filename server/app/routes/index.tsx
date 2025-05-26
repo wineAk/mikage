@@ -66,26 +66,27 @@ export default function Index({ loaderData }: Route.ComponentProps) {
     setMinute(value);
   };
 
-  // targetとlogsを管理
+  // targetを管理
   const [targets, setTargets] = useState<Target[] | null>(null);
-  const [logs, setLogs] = useState<Key[] | null>(null);
   useEffect(() => {
-    // targets取得
     fetch("/api/v1/targets")
       .then((res) => res.json())
       .then((res) => {
         const targets = res.data;
         setTargets(targets);
-        // targets取得後にlogsも取得
-        if (now && minute && targets) {
-          const targetKeys = targets.map((target: Target) => target.key);
-          const minuteValue = parseMinuteString(minute);
-          fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
-            .then((res) => res.json())
-            .then((res) => setLogs(res.data));
-        }
       });
-  }, [now, minute]);
+  }, []);
+
+  // logsを管理
+  const [logs, setLogs] = useState<Key[] | null>(null);
+  useEffect(() => {
+    if (!now || !minute || !targets) return;
+    const targetKeys = targets.map((target: Target) => target.key);
+    const minuteValue = parseMinuteString(minute);
+    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
+      .then((res) => res.json())
+      .then((res) => setLogs(res.data));
+  }, [now, minute, targets]);
 
   return (
     <>
