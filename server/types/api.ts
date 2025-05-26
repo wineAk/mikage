@@ -5,7 +5,7 @@ export type NotFound = {
 }
 
 // api/errors.tsx
-export type Error = {
+export type ErrorLog = {
   name: string;
   target_key: string;
   created_at: string;
@@ -14,6 +14,15 @@ export type Error = {
   status_message: string | null;
   error_code: string | null;
   error_name: string | null;
+}
+
+export type Error = {
+  // 前月の件数
+  previous_month_count: number;
+  // 次月の件数
+  next_month_count: number;
+  // 今月のログ
+  logs: ErrorLog[];
 }
 
 // api/incidents.tsx

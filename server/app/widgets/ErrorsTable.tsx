@@ -1,4 +1,4 @@
-import type { Error } from "@/types/api";
+import type { ErrorLog, Error } from "@/types/api";
 
 import { useEffect, useState } from "react";
 
@@ -29,7 +29,7 @@ type ErrorsTableProps = {
 };
 
 export default function ErrorsTable({ className }: ErrorsTableProps) {
-  const [data, setData] = useState<Error[] | null>(null);
+  const [data, setData] = useState<Error | null>(null);
   const [offset, setOffset] = useState(0);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
         if (error) {
           setData(null);
         } else {
-          setData(data || []);
+          setData(data);
         }
       });
   }, [offset]);
@@ -57,7 +57,7 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
               variant="outline"
               size="sm"
               onClick={handlePrev}
-              disabled={data?.length === 0}
+              disabled={!data || data.previous_month_count === 0}
               className="cursor-pointer"
             >
               前へ
@@ -66,7 +66,7 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
               variant="outline"
               size="sm"
               onClick={handleNext}
-              disabled={offset === 0}
+              disabled={!data || data.next_month_count === 0}
               className="cursor-pointer"
             >
               次へ
@@ -74,8 +74,8 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
           </div>
         </CardTitle>
       </CardHeader>
-      {data ? (
-        <TableList data={data} />
+      {data && data.logs ? (
+        <TableList data={data.logs} />
       ) : (
         <SpinnerCircleLarge className="border-red-800" />
       )}
@@ -84,7 +84,7 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
 }
 
 type TableListProps = {
-  data: Error[];
+  data: ErrorLog[];
 };
 
 function TableList({ data }: TableListProps) {

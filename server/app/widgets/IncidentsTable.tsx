@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Error, Incident, Target } from "@/types/api";
+import type { ErrorLog, Error, Incident, Target } from "@/types/api";
 
 import {
   Accordion,
@@ -26,12 +26,12 @@ type IncidentsTableProps = {
 };
 
 type IncidentError = Incident & {
-  errors: Error[];
+  errors: ErrorLog[];
 };
 
 type TimelineItem = {
   incident: IncidentError;
-  groupedErrors: Record<string, Error[]>;
+  groupedErrors: Record<string, ErrorLog[]>;
   created_date: string;
   updated_date: string;
   hours: number;
@@ -42,21 +42,21 @@ type TimelineItem = {
 };
 
 // groupedErrorsを生成し、2件以上のエラーグループがあるか判定
-function getGroupedErrors(errors: Error[]) {
+function getGroupedErrors(errors: ErrorLog[]) {
   return errors.reduce((acc, error) => {
     if (!acc[error.target_key]) acc[error.target_key] = [];
     acc[error.target_key].push(error);
     return acc;
-  }, {} as Record<string, Error[]>);
+  }, {} as Record<string, ErrorLog[]>);
 }
 
 // 2件以上のエラーグループがあるか判定
-function hasArrayMore(groupedErrors: Record<string, Error[]>) {
+function hasArrayMore(groupedErrors: Record<string, ErrorLog[]>) {
   return Object.values(groupedErrors).some(arr => arr.length >= 2);
 }
 
 // incidentとerrorsから該当エラー配列を抽出
-function getFilteredErrors(incident: Incident, errors: Error[]): Error[] {
+function getFilteredErrors(incident: Incident, errors: ErrorLog[]): ErrorLog[] {
   const { keyword, created_at, updated_at } = incident;
   const created_date = new Date(created_at);
   created_date.setSeconds(0, 0);
@@ -70,7 +70,7 @@ function getFilteredErrors(incident: Incident, errors: Error[]): Error[] {
 }
 
 // groupedErrorsからtargetNamesを生成
-function getTargetNames(groupedErrors: Record<string, Error[]>, targets: Target[]): Record<string, string | undefined> {
+function getTargetNames(groupedErrors: Record<string, ErrorLog[]>, targets: Target[]): Record<string, string | undefined> {
   return Object.fromEntries(
     Object.keys(groupedErrors).map((key) => [
       key,
@@ -98,6 +98,7 @@ export default function IncidentsTable({
   const handlePrev = () => setOffset((prev) => prev + 1);
   const handleNext = () => setOffset((prev) => Math.max(0, prev - 1));
 
+  const [error, setError] = useState<Error | null>(null);
   const [timeline, setTimeline] = useState<TimelineItem[] | null>(null);
   useEffect(() => {
     Promise.all([
@@ -105,9 +106,10 @@ export default function IncidentsTable({
       fetch(`/api/v1/errors/${offset}`).then((res) => res.json()),
     ]).then(([incidentsRes, errorsRes]) => {
       if (!incidentsRes.data || !errorsRes.data || !targets) return;
+      setError(errorsRes.data);
       // incidentsErrors生成
       const filteredIncidents = incidentsRes.data.reduce((acc: IncidentError[], incident: Incident) => {
-        const filtered = getFilteredErrors(incident, errorsRes.data);
+        const filtered = getFilteredErrors(incident, errorsRes.data.logs);
         const groupedErrors = getGroupedErrors(filtered);
         if (hasArrayMore(groupedErrors)) {
           acc.push({ ...incident, errors: filtered });
@@ -154,7 +156,7 @@ export default function IncidentsTable({
               variant="outline"
               size="sm"
               onClick={handlePrev}
-              disabled={timeline?.length === 0}
+              disabled={!error || error.previous_month_count === 0}
               className="cursor-pointer"
             >
               前へ
@@ -163,7 +165,7 @@ export default function IncidentsTable({
               variant="outline"
               size="sm"
               onClick={handleNext}
-              disabled={offset === 0}
+              disabled={!error || error.next_month_count === 0}
               className="cursor-pointer"
             >
               次へ

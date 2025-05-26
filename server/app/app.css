@@ -135,3 +135,7 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+body[data-scroll-locked] [data-slot="tabs"] > div:has([role="tablist"]) {
+  padding-right: 15px !important;
+}

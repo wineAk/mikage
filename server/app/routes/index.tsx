@@ -48,18 +48,27 @@ function parseMinuteString(minute: string | null): number {
 export async function loader({ request }: Route.LoaderArgs) {}
 
 export default function Index({ loaderData }: Route.ComponentProps) {
-  // 個別に管理する状態
+  // 現在時刻を管理
   const [now, setNow] = useState(formatDateTime());
-  const [minute, setMinute] = useState("60*1");
-  const [targets, setTargets] = useState<Target[] | null>(null);
-  const [logs, setLogs] = useState<Key[] | null>(null);
-
-  // 時間・ターゲット・ログの一括更新
   const updateNow = useCallback(() => {
     setNow(formatDateTime());
   }, []);
+  // 5分ごとにnowを更新
+  useInterval(updateNow, 5 * 60 * 1000);
 
-  // targets取得
+  // 分間隔を管理
+  const [minute, setMinute] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    if (!minute) setMinute("60*1");
+  }, []);
+  // minute変更ハンドラ
+  const handleMinuteChange = (value: string) => {
+    setMinute(value);
+  };
+
+  // targetとlogsを管理
+  const [targets, setTargets] = useState<Target[] | null>(null);
+  const [logs, setLogs] = useState<Key[] | null>(null);
   useEffect(() => {
     // targets取得
     fetch("/api/v1/targets")
@@ -67,7 +76,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       .then((res) => {
         const targets = res.data;
         setTargets(targets);
-
         // targets取得後にlogsも取得
         if (now && minute && targets) {
           const targetKeys = targets.map((target: Target) => target.key);
@@ -79,34 +87,28 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       });
   }, [now, minute]);
 
-  // 5分ごとにnowを更新
-  useInterval(updateNow, 5 * 60 * 1000);
-
-  // minute変更ハンドラ
-  const handleMinuteChange = (value: string) => {
-    setMinute(value);
-  };
-
   return (
-    <main className="flex flex-col gap-4 p-4">
-      <Tabs defaultValue="status" className="">
-        <div className="fixed z-2 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
-          <TabsList className="w-full h-full bg-transparent p-0">
-            {["status", "incidents", "errors", "login"].map((tab) => (
-              <TabsTrigger
-                key={tab}
-                value={tab}
-                className="h-full rounded-none cursor-pointer hover:bg-neutral-100/50 data-[state=active]:bg-neutral-200/50 data-[state=active]:shadow-none"
-                onClick={() => {
-                  window.scrollTo({ top: 0, behavior: "smooth" });
-                }}
-              >
-                {tab}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+    <>
+      <Tabs defaultValue="status">
+        <div className="fixed z-2 w-full">
+          <div className="h-14 max-w-screen-xl mx-4 xl:mx-auto mt-4">
+            <TabsList className="w-full h-full p-0 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl rounded-full overflow-hidden">
+              {["status", "incidents", "errors", "login"].map((tab) => (
+                <TabsTrigger
+                  key={tab}
+                  value={tab}
+                  className="h-full rounded-none cursor-pointer hover:bg-neutral-100/50 data-[state=active]:bg-neutral-200/50 data-[state=active]:shadow-none"
+                  onClick={() => {
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  {tab}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
         </div>
-        <div className="mt-18">
+        <div className="mt-18 p-4">
           <TabsContent value="status">
             <Status
               now={now}
@@ -127,14 +129,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </TabsContent>
         </div>
       </Tabs>
-    </main>
+    </>
   );
 }
 
 // StatusProps型
 type StatusProps = {
   now: string;
-  minute: string;
+  minute: string | undefined;
   setMinute: (value: string) => void;
   logs: Key[] | null;
   targets: Target[] | null;
@@ -152,7 +154,7 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
           <Select value={minute} onValueChange={setMinute}>
             <SelectTrigger className="w-24 cursor-pointer bg-white">
               <SelectValue
-                placeholder={minute === null ? "読み込み中……" : undefined}
+                placeholder={minute === undefined ? "読み込み中……" : undefined}
               />
             </SelectTrigger>
             <SelectContent align="end">
