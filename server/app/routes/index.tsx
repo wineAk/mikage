@@ -90,7 +90,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   return (
     <main className="flex flex-col gap-4 p-4">
       <Tabs defaultValue="status" className="">
-        <div className="fixed z-100 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
+        <div className="fixed z-2 top-4 inset-x-4 h-14 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl mx-4 rounded-full overflow-hidden">
           <TabsList className="w-full h-full bg-transparent p-0">
             {["status", "incidents", "errors", "login"].map((tab) => (
               <TabsTrigger
