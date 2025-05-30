@@ -714,17 +714,14 @@ export async function loader({ request }: Route.LoaderArgs) {
   // エラーがある配列を返す関数
   function findErrorResults(
     results: LogResult[],
-    key: string | string[]
+    key: RegExp
   ): LogResult[] {
-    const keys = Array.isArray(key) ? key : [key];
-    const filtered = results.filter(
-      (result) =>
-        keys.some((k) => result.key.includes(k)) &&
-        (result.log.statusCode !== 200 ||
-          (result.log.errorCode !== null &&
-            result.log.errorCode !== "NO_INTERNET"))
+    return results.filter((result) =>
+      key.test(result.key) &&
+      (result.log.statusCode !== 200 ||
+        (result.log.errorCode !== null &&
+          result.log.errorCode !== "NO_INTERNET"))
     );
-    return filtered;
   }
 
   // インシデントを更新する関数
@@ -823,10 +820,9 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .is("is_closed", null);
 
-  const saaskeErrors = findErrorResults(results, "saaske");
-  const worksErrors = findErrorResults(results, "works");
-  const webErrors = findErrorResults(results, "web");
-  //const anyErrors = findErrorResults(results, ["saaske", "works"]);
+  const saaskeErrors = findErrorResults(results, /^saaske(\\d+|_.*)$/);
+  const worksErrors = findErrorResults(results, /^works\\d+$/);
+  const webErrors = findErrorResults(results, /^web_.*$/);
 
   const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
   const worksIncident = incidents?.find((i) => i.keyword === "works");
