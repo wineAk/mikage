@@ -223,7 +223,7 @@ export function DataTable<TData, TValue>({
                 {/* 足りない分だけ空行を追加 */}
                 {Array.from({ length: emptyRows > 0 ? emptyRows : 0 }).map(
                   (_, i) => (
-                    <TableRow key={`empty-${i}`}>
+                    <TableRow key={`empty-${i}`} className="opacity-50">
                       {table.getAllColumns().map((col) => (
                         <TableCell key={col.id} className="h-10" />
                       ))}
