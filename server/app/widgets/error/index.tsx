@@ -1,6 +1,6 @@
 import type { ErrorLog } from "@/types/api";
-import { columns } from "./columns";
 
+import { columns } from "./columns";
 import { DataTable } from "./dataTable";
 
 import { CardContent } from "~/components/ui/card";

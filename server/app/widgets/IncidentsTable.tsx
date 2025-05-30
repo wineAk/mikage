@@ -195,146 +195,186 @@ export default function IncidentsTable({
 }
 
 function Timeline({ timeline }: { timeline: TimelineItem[] }) {
+  // 今日・昨日・一昨日の3日分だけ抽出
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const threeDaysAgo = new Date(today);
+  threeDaysAgo.setDate(today.getDate() - 2); // 今日＋2日前＝3日分
+  const timelineToShow = timeline.filter((item) => {
+    const d = new Date(item.incident.created_at);
+    d.setHours(0, 0, 0, 0);
+    return d >= threeDaysAgo;
+  });
+  const timelineToHide = timeline.filter((item) => {
+    const d = new Date(item.incident.created_at);
+    d.setHours(0, 0, 0, 0);
+    return d < threeDaysAgo;
+  });
+
   return (
     <div className="">
       <div className="relative ml-3">
         <div className="absolute left-0 top-4 bottom-0 border-l-2" />
-        {[...timeline].reverse().map((item, incidentIndex) => {
-          const {
-            incident,
-            groupedErrors,
-            created_date,
-            updated_date,
-            hours,
-            minutes,
-            is_closed,
-            is_today,
-            targetNames,
-          } = item;
-          const { keyword, instatus_id } = incident;
-          const titles = {
-            saaske: "サスケ",
-            works: "Works",
-            web: "ホームページ",
-          };
-          const bgColor = is_closed ? "bg-green-100" : "bg-red-100";
-          const textColor = is_closed ? "text-green-800" : "text-red-800";
-          const StatusIcon = is_closed ? Check : Flame;
-          const StatusText = is_closed ? "closed" : "down";
-          return (
-            <div key={incidentIndex} className="relative pl-8 pb-12 last:pb-0">
-              <div className="absolute h-3 w-3 -translate-x-1/2 left-px top-2 rounded-full border-2 border-primary bg-background" />
-              <div className="space-y-4">
-                <h3
-                  className={`text-lg sm:text-xl font-semibold flex items-center gap-2`}
-                >
-                  <Badge className={`gap-1.5 ${bgColor}`}>
-                    <StatusIcon className={`${textColor}`} />
-                    <span className={`${textColor}`}>{StatusText}</span>
-                  </Badge>
-                  {is_today && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-amber-100 text-amber-800"
-                    >
-                      New
-                    </Badge>
-                  )}
-                  <span>{titles[keyword as keyof typeof titles]}</span>
-                  {instatus_id && (
-                    <Link
-                      to={`https://dmyske.instatus.com//${instatus_id}`}
-                      target="_blank"
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      <SquareArrowOutUpRight />
-                    </Link>
-                  )}
-                </h3>
-                <div className="sm:flex sm:items-center sm:gap-4 sm:space-y-0 space-y-2">
-                  <div className="flex items-center gap-2 text-sm">
-                    <Calendar className="h-4 w-4" />
-                    <span>{created_date}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                      {hours > 0 && `${hours}時間 ${minutes}分`}
-                      {hours === 0 && `${minutes}分間`}
-                    </span>
-                  </div>
-                </div>
-                <Accordion type="multiple" className="max-w-lg w-full">
-                  {Object.entries(groupedErrors)
-                    .sort(([a], [b]) => a.localeCompare(b))
-                    .map(([target_key, errorList], index) => {
-                      const bgColor = getColorListsFromKey(target_key).bg;
-                      const textColor = getColorListsFromKey(target_key).text;
-                      const target_name = targetNames[target_key];
-                      return (
-                        <AccordionItem
-                          key={index}
-                          value={`item-${index}`}
-                          className="border border-b-0 last:border-b first:rounded-t-md last:rounded-b-md"
-                        >
-                          <AccordionTrigger className="cursor-pointer px-4 hover:no-underline">
-                            <div className="flex items-center gap-2">
-                              <Badge className={`${bgColor} ${textColor}`}>
-                                {errorList.length}件
-                              </Badge>
-                              {target_name}
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="p-0">
-                            {errorList.map((error, i) => (
-                              <div
-                                key={i}
-                                className="p-4 space-y-2 border-t-1 border-neutral-200"
-                              >
-                                <div>
-                                  {new Date(
-                                    error.created_at
-                                  ).toLocaleTimeString("ja-JP", {
-                                    timeZone: "Asia/Tokyo",
-                                    year: "numeric",
-                                    month: "2-digit",
-                                    day: "2-digit",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                    second: "2-digit",
-                                  })}
-                                </div>
-                                <div className="flex gap-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="w-24 empty:hidden"
-                                  >
-                                    {error.status_code}
-                                  </Badge>
-                                  <div>{error.status_message}</div>
-                                </div>
-                                <div className="flex gap-2">
-                                  <Badge
-                                    variant="secondary"
-                                    className="w-24 empty:hidden"
-                                  >
-                                    {error.error_code}
-                                  </Badge>
-                                  <div title={String(error.error_name)}>
-                                    {error.error_name}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </AccordionContent>
-                        </AccordionItem>
-                      );
-                    })}
-                </Accordion>
-              </div>
+        {[...timelineToShow].reverse().map((item, incidentIndex) => (
+          <TimelineItem key={incidentIndex} item={item} index={incidentIndex} />
+        ))}
+        <Accordion type="single" collapsible className="-ml-2">
+          <AccordionItem value="timeline-more">
+            <AccordionContent className="pl-2">
+                {[...timelineToHide].map((item, incidentIndex) => (
+                  <TimelineItem
+                    key={incidentIndex}
+                    item={item}
+                    index={incidentIndex}
+                  />
+                ))}
+            </AccordionContent>
+            <div className="flex justify-center">
+              <AccordionTrigger className="justify-center items-center h-12 w-34 cursor-pointer px-4 hover:no-underline data-[state=open]:hidden hover:bg-neutral-200">
+                もっと見る
+              </AccordionTrigger>
+              <AccordionTrigger className="justify-center items-center h-12 w-34 cursor-pointer px-4 hover:no-underline data-[state=closed]:hidden hover:bg-neutral-200">
+                閉じる
+              </AccordionTrigger>
             </div>
-          );
-        })}
+          </AccordionItem>
+        </Accordion>
+
+      </div>
+    </div>
+  );
+}
+
+function TimelineItem({ item, index }: { item: TimelineItem; index: number }) {
+  const {
+    incident,
+    groupedErrors,
+    created_date,
+    updated_date,
+    hours,
+    minutes,
+    is_closed,
+    is_today,
+    targetNames,
+  } = item;
+  const { keyword, instatus_id } = incident;
+  const titles = {
+    saaske: "サスケ",
+    works: "Works",
+    web: "ホームページ",
+  };
+  const bgColor = is_closed ? "bg-green-100" : "bg-red-100";
+  const textColor = is_closed ? "text-green-800" : "text-red-800";
+  const StatusIcon = is_closed ? Check : Flame;
+  const StatusText = is_closed ? "closed" : "down";
+  return (
+    <div className="relative pl-8 pb-12">
+      <div className="absolute h-3 w-3 -translate-x-1/2 left-px top-2 rounded-full border-2 border-primary bg-background" />
+      <div className="space-y-4">
+        <h3
+          className={`text-lg sm:text-xl font-semibold flex items-center gap-2`}
+        >
+          <Badge className={`gap-1.5 ${bgColor}`}>
+            <StatusIcon className={`${textColor}`} />
+            <span className={`${textColor}`}>{StatusText}</span>
+          </Badge>
+          {is_today && (
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+              New
+            </Badge>
+          )}
+          <span>{titles[keyword as keyof typeof titles]}</span>
+          {instatus_id && (
+            <Link
+              to={`https://dmyske.instatus.com//${instatus_id}`}
+              target="_blank"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <SquareArrowOutUpRight />
+            </Link>
+          )}
+        </h3>
+        <div className="sm:flex sm:items-center sm:gap-4 sm:space-y-0 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <Calendar className="h-4 w-4" />
+            <span>{created_date}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4" />
+            <span>
+              {hours > 0 && `${hours}時間 ${minutes}分`}
+              {hours === 0 && `${minutes}分間`}
+            </span>
+          </div>
+        </div>
+        <Accordion type="multiple" className="max-w-lg w-full">
+          {Object.entries(groupedErrors)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([target_key, errorList], idx) => {
+              const bgColor = getColorListsFromKey(target_key).bg;
+              const textColor = getColorListsFromKey(target_key).text;
+              const target_name = targetNames[target_key];
+              return (
+                <AccordionItem
+                  key={idx}
+                  value={`item-${idx}`}
+                  className="border border-b-0 last:border-b first:rounded-t-md last:rounded-b-md"
+                >
+                  <AccordionTrigger className="cursor-pointer px-4 hover:no-underline">
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${bgColor} ${textColor}`}>
+                        {errorList.length}件
+                      </Badge>
+                      {target_name}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-0">
+                    {errorList.map((error, i) => (
+                      <div
+                        key={i}
+                        className="p-4 space-y-2 border-t-1 border-neutral-200"
+                      >
+                        <div>
+                          {new Date(error.created_at).toLocaleTimeString(
+                            "ja-JP",
+                            {
+                              timeZone: "Asia/Tokyo",
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            }
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge
+                            variant="secondary"
+                            className="w-24 empty:hidden"
+                          >
+                            {error.status_code}
+                          </Badge>
+                          <div>{error.status_message}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Badge
+                            variant="secondary"
+                            className="w-24 empty:hidden"
+                          >
+                            {error.error_code}
+                          </Badge>
+                          <div title={String(error.error_name)}>
+                            {error.error_name}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+        </Accordion>
       </div>
     </div>
   );
