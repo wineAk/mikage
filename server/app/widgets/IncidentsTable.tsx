@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 import type { ErrorLog, Error, Incident, Target } from "@/types/api";
 
 import {
@@ -8,14 +9,15 @@ import {
   AccordionTrigger,
 } from "~/components/ui/accordion";
 import { Badge } from "~/components/ui/badge";
-import { Button } from "~/components/ui/button";
+import { Button, buttonVariants } from "~/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
-import { Calendar, Check, Clock, Flame } from "lucide-react";
+  Calendar,
+  Check,
+  Clock,
+  Flame,
+  SquareArrowOutUpRight,
+} from "lucide-react";
 
 import SpinnerCircleLarge from "./SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
@@ -52,7 +54,7 @@ function getGroupedErrors(errors: ErrorLog[]) {
 
 // 2件以上のエラーグループがあるか判定
 function hasArrayMore(groupedErrors: Record<string, ErrorLog[]>) {
-  return Object.values(groupedErrors).some(arr => arr.length >= 2);
+  return Object.values(groupedErrors).some((arr) => arr.length >= 2);
 }
 
 // incidentとerrorsから該当エラー配列を抽出
@@ -70,7 +72,10 @@ function getFilteredErrors(incident: Incident, errors: ErrorLog[]): ErrorLog[] {
 }
 
 // groupedErrorsからtargetNamesを生成
-function getTargetNames(groupedErrors: Record<string, ErrorLog[]>, targets: Target[]): Record<string, string | undefined> {
+function getTargetNames(
+  groupedErrors: Record<string, ErrorLog[]>,
+  targets: Target[]
+): Record<string, string | undefined> {
   return Object.fromEntries(
     Object.keys(groupedErrors).map((key) => [
       key,
@@ -108,40 +113,45 @@ export default function IncidentsTable({
       if (!incidentsRes.data || !errorsRes.data || !targets) return;
       setError(errorsRes.data);
       // incidentsErrors生成
-      const filteredIncidents = incidentsRes.data.reduce((acc: IncidentError[], incident: Incident) => {
-        const filtered = getFilteredErrors(incident, errorsRes.data.logs);
-        const groupedErrors = getGroupedErrors(filtered);
-        if (hasArrayMore(groupedErrors)) {
-          acc.push({ ...incident, errors: filtered });
-        }
-        return acc;
-      }, []);
+      const filteredIncidents = incidentsRes.data.reduce(
+        (acc: IncidentError[], incident: Incident) => {
+          const filtered = getFilteredErrors(incident, errorsRes.data.logs);
+          const groupedErrors = getGroupedErrors(filtered);
+          if (hasArrayMore(groupedErrors)) {
+            acc.push({ ...incident, errors: filtered });
+          }
+          return acc;
+        },
+        []
+      );
 
       // timeline生成
-      const timelineData = filteredIncidents.map((incidentErrors: IncidentError) => {
-        const { created_at, updated_at, is_closed, errors } = incidentErrors;
-        const createdDateObj = new Date(created_at);
-        const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
-        const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
-        const diffMinutes = Math.ceil(diffMs / 1000 / 60);
-        const hours = Math.floor(diffMinutes / 60);
-        const minutes = diffMinutes % 60;
-        const groupedErrors = getGroupedErrors(errors);
-        const targetNames = getTargetNames(groupedErrors, targets);
-        return {
-          incident: incidentErrors,
-          groupedErrors,
-          created_date: formatDateTime(createdDateObj),
-          updated_date: formatDateTime(updatedDateObj),
-          hours,
-          minutes,
-          is_closed: !!is_closed,
-          is_today:
-            createdDateObj.toLocaleDateString("ja-JP") ===
-            new Date().toLocaleDateString("ja-JP"),
-          targetNames,
-        };
-      });
+      const timelineData = filteredIncidents.map(
+        (incidentErrors: IncidentError) => {
+          const { created_at, updated_at, is_closed, errors } = incidentErrors;
+          const createdDateObj = new Date(created_at);
+          const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
+          const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
+          const diffMinutes = Math.ceil(diffMs / 1000 / 60);
+          const hours = Math.floor(diffMinutes / 60);
+          const minutes = diffMinutes % 60;
+          const groupedErrors = getGroupedErrors(errors);
+          const targetNames = getTargetNames(groupedErrors, targets);
+          return {
+            incident: incidentErrors,
+            groupedErrors,
+            created_date: formatDateTime(createdDateObj),
+            updated_date: formatDateTime(updatedDateObj),
+            hours,
+            minutes,
+            is_closed: !!is_closed,
+            is_today:
+              createdDateObj.toLocaleDateString("ja-JP") ===
+              new Date().toLocaleDateString("ja-JP"),
+            targetNames,
+          };
+        }
+      );
       setTimeline(timelineData);
     });
   }, [offset]);
@@ -159,7 +169,7 @@ export default function IncidentsTable({
               disabled={!error || error.previous_month_count === 0}
               className="cursor-pointer"
             >
-              前へ
+              前月
             </Button>
             <Button
               variant="outline"
@@ -168,7 +178,7 @@ export default function IncidentsTable({
               disabled={!error || error.next_month_count === 0}
               className="cursor-pointer"
             >
-              次へ
+              次月
             </Button>
           </div>
         </CardTitle>
@@ -201,7 +211,7 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
             is_today,
             targetNames,
           } = item;
-          const { keyword } = incident;
+          const { keyword, instatus_id } = incident;
           const titles = {
             saaske: "サスケ",
             works: "Works",
@@ -223,11 +233,23 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
                     <span className={`${textColor}`}>{StatusText}</span>
                   </Badge>
                   {is_today && (
-                    <Badge variant="secondary" className="bg-amber-100 text-amber-800">
+                    <Badge
+                      variant="secondary"
+                      className="bg-amber-100 text-amber-800"
+                    >
                       New
                     </Badge>
                   )}
                   <span>{titles[keyword as keyof typeof titles]}</span>
+                  {instatus_id && (
+                    <Link
+                      to={`https://dmyske.instatus.com//${instatus_id}`}
+                      target="_blank"
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      <SquareArrowOutUpRight />
+                    </Link>
+                  )}
                 </h3>
                 <div className="sm:flex sm:items-center sm:gap-4 sm:space-y-0 space-y-2">
                   <div className="flex items-center gap-2 text-sm">

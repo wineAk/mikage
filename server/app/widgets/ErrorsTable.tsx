@@ -23,6 +23,7 @@ import {
 
 import SpinnerCircleLarge from "./SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
+import ErrorTable from "./error/index";
 
 type ErrorsTableProps = {
   className?: string;
@@ -60,7 +61,7 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
               disabled={!data || data.previous_month_count === 0}
               className="cursor-pointer"
             >
-              前へ
+              前月
             </Button>
             <Button
               variant="outline"
@@ -69,13 +70,13 @@ export default function ErrorsTable({ className }: ErrorsTableProps) {
               disabled={!data || data.next_month_count === 0}
               className="cursor-pointer"
             >
-              次へ
+              次月
             </Button>
           </div>
         </CardTitle>
       </CardHeader>
       {data && data.logs ? (
-        <TableList data={data.logs} />
+        <ErrorTable data={data.logs} />
       ) : (
         <SpinnerCircleLarge className="border-red-800" />
       )}
