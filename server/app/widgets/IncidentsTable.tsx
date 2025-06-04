@@ -196,20 +196,22 @@ export default function IncidentsTable({
 
 function Timeline({ timeline }: { timeline: TimelineItem[] }) {
   // 今日・昨日・一昨日の3日分だけ抽出
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const threeDaysAgo = new Date(today);
-  threeDaysAgo.setDate(today.getDate() - 2); // 今日＋2日前＝3日分
-  const timelineToShow = timeline.filter((item) => {
-    const d = new Date(item.incident.created_at);
-    d.setHours(0, 0, 0, 0);
-    return d >= threeDaysAgo;
-  });
-  const timelineToHide = timeline.filter((item) => {
-    const d = new Date(item.incident.created_at);
-    d.setHours(0, 0, 0, 0);
-    return d < threeDaysAgo;
-  });
+  // const today = new Date();
+  // today.setHours(0, 0, 0, 0);
+  // const threeDaysAgo = new Date(today);
+  // threeDaysAgo.setDate(today.getDate() - 2); // 今日＋2日前＝3日分
+  //const timelineToShow = timeline.filter((item) => {
+  //  const d = new Date(item.incident.created_at);
+  //  d.setHours(0, 0, 0, 0);
+  //  return d >= threeDaysAgo;
+  //});
+  //const timelineToHide = timeline.filter((item) => {
+  //  const d = new Date(item.incident.created_at);
+  //  d.setHours(0, 0, 0, 0);
+  //  return d < threeDaysAgo;
+  //});
+  const timelineToShow = timeline.slice(0, 3);
+  const timelineToHide = timeline.slice(3);
 
   return (
     <div className="">
@@ -218,9 +220,10 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
         {[...timelineToShow].reverse().map((item, incidentIndex) => (
           <TimelineItem key={incidentIndex} item={item} index={incidentIndex} />
         ))}
-        <Accordion type="single" collapsible className="-ml-2">
-          <AccordionItem value="timeline-more">
-            <AccordionContent className="pl-2">
+        {timelineToHide.length > 0 && (
+          <Accordion type="single" collapsible className="-ml-2">
+            <AccordionItem value="timeline-more">
+              <AccordionContent className="pl-2">
                 {[...timelineToHide].map((item, incidentIndex) => (
                   <TimelineItem
                     key={incidentIndex}
@@ -228,18 +231,18 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
                     index={incidentIndex}
                   />
                 ))}
-            </AccordionContent>
-            <div className="flex justify-center">
-              <AccordionTrigger className="justify-center items-center h-12 w-34 cursor-pointer px-4 hover:no-underline data-[state=open]:hidden hover:bg-neutral-200">
-                もっと見る
-              </AccordionTrigger>
-              <AccordionTrigger className="justify-center items-center h-12 w-34 cursor-pointer px-4 hover:no-underline data-[state=closed]:hidden hover:bg-neutral-200">
-                閉じる
-              </AccordionTrigger>
-            </div>
-          </AccordionItem>
-        </Accordion>
-
+              </AccordionContent>
+              <div className="flex justify-center">
+                <AccordionTrigger className="justify-center items-center h-12 w-48 cursor-pointer px-4 hover:no-underline data-[state=open]:hidden hover:bg-neutral-200">
+                  もっと見る（{timelineToHide.length}件）
+                </AccordionTrigger>
+                <AccordionTrigger className="justify-center items-center h-12 w-48 cursor-pointer px-4 hover:no-underline data-[state=closed]:hidden hover:bg-neutral-200">
+                  閉じる
+                </AccordionTrigger>
+              </div>
+            </AccordionItem>
+          </Accordion>
+        )}
       </div>
     </div>
   );

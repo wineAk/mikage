@@ -12,7 +12,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const month = now.getMonth();
 
   // offset分だけ月をずらす
-  const targetStart = new Date(year, month + offsetNum, 1, 0, 0, 0, 0);
+  const targetStart = new Date(year, month - offsetNum, 1, 0, 0, 0, 0);
   // 次の月の1日（＝今月の末日23:59:59の次の瞬間）
   const targetEnd = new Date(targetStart.getFullYear(), targetStart.getMonth() + 1, 1, 0, 0, 0, 0);
 
