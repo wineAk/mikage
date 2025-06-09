@@ -152,7 +152,8 @@ export default function IncidentsTable({
           };
         }
       );
-      setTimeline(timelineData);
+      // 新しい順に並び替えして保存
+      setTimeline(timelineData.reverse());
     });
   }, [offset]);
 
@@ -217,7 +218,7 @@ function Timeline({ timeline }: { timeline: TimelineItem[] }) {
     <div className="">
       <div className="relative ml-3">
         <div className="absolute left-0 top-4 bottom-0 border-l-2" />
-        {[...timelineToShow].reverse().map((item, incidentIndex) => (
+        {[...timelineToShow].map((item, incidentIndex) => (
           <TimelineItem key={incidentIndex} item={item} index={incidentIndex} />
         ))}
         {timelineToHide.length > 0 && (
