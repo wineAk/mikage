@@ -290,7 +290,7 @@ function TimelineItem({ item, index }: { item: TimelineItem; index: number }) {
           <span>{titles[keyword as keyof typeof titles]}</span>
           {instatus_id && (
             <Link
-              to={`https://dmyske.instatus.com//${instatus_id}`}
+              to={`https://works.instatus.com/${instatus_id}`}
               target="_blank"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
