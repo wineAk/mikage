@@ -84,6 +84,13 @@ export const colorList = {
     text: "text-black",
     oklch: "var(--color-orange-200)",
   },
+  saaske_webtracking_v2: {
+    bg: "bg-orange-300",
+    hoverBg: "hover:bg-orange-300/80",
+    border: "border-orange-300",
+    text: "text-black",
+    oklch: "var(--color-orange-300)",
+  },
   saaske_broad_ap: {
     bg: "bg-purple-200",
     hoverBg: "hover:bg-purple-200/80",
