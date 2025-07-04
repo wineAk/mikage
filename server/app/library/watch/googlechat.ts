@@ -128,9 +128,7 @@ export async function updateThreadGoogleChat(errors: LogResult[], name: string) 
 // スレッド終了
 export async function resolveThreadGoogleChat(errors: LogResult[], name: string) {
   const url = `${googleChatWebhookUrl}&messageReplyOption=REPLY_MESSAGE_OR_FAIL`;
-  const title = "✅インシデント 終了";
-  const message = errors.map((error) =>  `- *${error.name}* `).join("\n");
-  const text = `${title}\n${message}`;
+  const text = "✅インシデント 終了";
   const body = { text, thread: { name } };
   return await sendGoogleChatRequest(url, body);
 }
