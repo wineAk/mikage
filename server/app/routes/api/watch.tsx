@@ -752,7 +752,10 @@ export async function loader({ request }: Route.LoaderArgs) {
         // Google Chatへ通知
         if (!googlechat_name) {
           console.log(`${label} Google Chatへ通知`);
+          // チャットのみ送信
           googleChatResult = await createThreadGoogleChat(errors);
+          // スレッドに詳細を送信
+          googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
         } else {
           console.log(`${label} Google Chatを更新`);
           googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
