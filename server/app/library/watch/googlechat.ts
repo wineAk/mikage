@@ -94,7 +94,10 @@ function createCardsV2(errors: LogResult[]) {
       }
     ]
   }
-  return [cards];
+  return [{
+    cardId: Math.random().toString(32).substring(2),
+    cards
+  }];
 }
 
 // Google Chat APIリクエスト送信
