@@ -754,21 +754,26 @@ export async function loader({ request }: Route.LoaderArgs) {
           console.log(`${label} Google Chatへ通知`);
           // チャットのみ送信
           googleChatResult = await createThreadGoogleChat(errors);
+          console.log("createThreadGoogleChat", googleChatResult);
           // スレッドに詳細を送信
           googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
+          console.log("updateThreadGoogleChat", googleChatResult);
         } else {
           console.log(`${label} Google Chatを更新`);
           googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
+          console.log("updateThreadGoogleChat", googleChatResult);
         }
         // WorksのみInstatusへ通知（更新は5回に1回）
         if (label === "works" && !instatus_id  && errorCount === 2 ) {
           console.log(`${label} Instatusへ通知`);
           const started = new Date(created_at).toISOString(); // 初回のみ作成日時を利用
           instatusResult = await createIncidentInstatus(started);
+          console.log("createIncidentInstatus", instatusResult);
         } else if (label === "works" && instatus_id && errorCount % 5 === 0) {
           console.log(`${label} Instatusを更新`);
           const started = new Date(updated_at).toISOString(); // 2回目以降は前回更新日時を利用
           instatusResult = await updateIncidentInstatus(instatus_id, started);
+          console.log("updateIncidentInstatus", instatusResult);
         }
         // Supabaseを更新
         supabaseResult = await supabase
@@ -792,12 +797,14 @@ export async function loader({ request }: Route.LoaderArgs) {
         if (googlechat_name) {
           console.log(`${label} Google Chatを終了`);
           googleChatResult = await resolveThreadGoogleChat(errors, googlechat_name);
+          console.log("resolveThreadGoogleChat", googleChatResult);
         }
         // Instatusを終了
         if (instatus_id) {
           console.log(`${label} Instatusを終了`);
           const started = new Date(now).toISOString(); // 終了ときは現在の日時を利用
           instatusResult = await resolveIncidentInstatus(instatus_id, started);
+          console.log("resolveIncidentInstatus", instatusResult);
         }
         // Supabaseを更新
         supabaseResult = await supabase
