@@ -54,7 +54,7 @@ function createCardsV2(errors: LogResult[]) {
     ];
     return widget;
   });
-  const cards = {
+  const card = {
     "header": {
       "title": "サスケ 監視ツール - ミカゲ",
       "subtitle": new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
@@ -96,7 +96,7 @@ function createCardsV2(errors: LogResult[]) {
   }
   return [{
     cardId: Math.random().toString(32).substring(2),
-    cards
+    card
   }];
 }
 
