@@ -5,7 +5,7 @@ const headers = { "Content-Type": "application/json" };
 
 // エラー内容をcardsV2化
 function createCardsV2(errors: LogResult[]) {
-  const widgets = errors.map((error) => {
+  const widgets = errors.flatMap((error) => {
     const { name, log } = error;
     const { responseTime, statusCode, statusMessage, errorCode, errorName } = log;
     // ICON: https://developers.google.com/workspace/chat/add-text-image-card-dialog#add-icon
@@ -54,7 +54,7 @@ function createCardsV2(errors: LogResult[]) {
     ];
     return widget;
   });
-  return {
+  const cards = {
     "header": {
       "title": "サスケ 監視ツール - ミカゲ",
       "subtitle": new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
@@ -94,6 +94,7 @@ function createCardsV2(errors: LogResult[]) {
       }
     ]
   }
+  return [cards];
 }
 
 // Google Chat APIリクエスト送信
@@ -109,9 +110,11 @@ export async function sendGoogleChatRequest(url: string, body: any) {
 // スレッド新規作成
 export async function createThreadGoogleChat(errors: LogResult[]) {
   const url = `${googleChatWebhookUrl}`;
-  const title = "🚨インシデント 発生";
-  const message = errors.map((error) =>  `- *${error.name}* `).join("\n");
-  const text = `${title}\n${message}`;
+  const text = [
+    "🚨インシデント 発生",
+    "",
+    ...errors.map((error) =>  `- *${error.name}* `),
+  ].join("\n");
   const body = { text };
   return await sendGoogleChatRequest(url, body);
 }
