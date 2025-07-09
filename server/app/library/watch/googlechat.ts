@@ -118,7 +118,7 @@ export async function createThreadGoogleChat(errors: LogResult[]) {
     ...errors.map((error) =>  `- *${error.name}* `),
   ].join("\n");
   const body = { text };
-  console.log("createThreadGoogleChat:", body);
+  console.log("createThreadGoogleChat:", JSON.stringify(body));
   return await sendGoogleChatRequest(url, body);
 }
 
@@ -128,7 +128,7 @@ export async function updateThreadGoogleChat(errors: LogResult[], name: string) 
   const cardsV2 = createCardsV2(errors);
   const text = "⚠️インシデント 発生中";
   const body = { text, cardsV2, thread: { name } };
-  console.log("updateThreadGoogleChat:", body);
+  console.log("updateThreadGoogleChat:", JSON.stringify(body));
   return await sendGoogleChatRequest(url, body);
 }
 
@@ -137,6 +137,6 @@ export async function resolveThreadGoogleChat(errors: LogResult[], name: string)
   const url = `${googleChatWebhookUrl}&messageReplyOption=REPLY_MESSAGE_OR_FAIL`;
   const text = "✅インシデント 終了";
   const body = { text, thread: { name } };
-  console.log("resolveThreadGoogleChat:", body);
+  console.log("resolveThreadGoogleChat:", JSON.stringify(body));
   return await sendGoogleChatRequest(url, body);
 }
