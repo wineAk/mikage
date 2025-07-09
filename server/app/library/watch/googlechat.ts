@@ -4,12 +4,13 @@ const googleChatWebhookUrl = process.env.VITE_GOOGLE_WEBHOOK_URL || "";
 const headers = { "Content-Type": "application/json" };
 
 // エラー内容をcardsV2化
+// CARD: https://addons.gsuite.google.com/uikit/builder?hl=ja
+// ICON: https://developers.google.com/workspace/chat/add-text-image-card-dialog#add-icon
 function createCardsV2(errors: LogResult[]) {
-  const widgets = errors.flatMap((error) => {
+  const sections = errors.map((error) => {
     const { name, log } = error;
     const { responseTime, statusCode, statusMessage, errorCode, errorName } = log;
-    // ICON: https://developers.google.com/workspace/chat/add-text-image-card-dialog#add-icon
-    const widget = [
+    const widgets = [
       {
         "decoratedText": {
           "icon": {
@@ -48,29 +49,22 @@ function createCardsV2(errors: LogResult[]) {
           
         }
       },
-      {
-        "divider": {}
-      },
     ];
-    return widget;
+    const section = {
+      "collapsible": true,
+      "uncollapsibleWidgetsCount": 1,
+      "widgets": widgets,
+    }
+    return section;
   });
   const card = {
     "header": {
       "title": "サスケ 監視ツール - ミカゲ",
       "subtitle": new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }),
-      "imageUrl": "https://mikage.onrender.com/android-chrome-192x192.png",
+      "imageUrl": "https://cldup.com/VM41agw9eH.png",
       "imageType": "CIRCLE"
     },
-    "sections": [
-      {
-        "header": `エラー詳細（${errors.length}件）`,
-        "collapsible": true,
-        "uncollapsibleWidgetsCount": 0,
-        "widgets": [
-          ...widgets,
-        ],
-      }
-    ],
+    "sections": sections,
     "fixedFooter": {
       "primaryButton": {
         "text": "サスケ 監視ツール - ミカゲ",
