@@ -63,36 +63,35 @@ function createCardsV2(errors: LogResult[]) {
     },
     "sections": [
       {
+        "header": `エラー詳細（${errors.length}件）`,
+        "collapsible": true,
+        "uncollapsibleWidgetsCount": 0,
         "widgets": [
           ...widgets,
-          {
-            "buttonList": {
-              "buttons": [
-                {
-                  "color": {
-                    "red": 0.3686274509803922,
-                    "green": 0.6470588235294118,
-                    "blue": 0,
-                    "alpha": 1
-                  },
-                  "icon": {
-                    "materialIcon": {
-                      "name": "open_in_new"
-                    }
-                  },
-                  "onClick": {
-                    "openLink": {
-                      "url": "https://mikage.onrender.com/"
-                    }
-                  },
-                  "text": "サスケ 監視ツール - ミカゲ"
-                }
-              ]
-            }
-          }
         ],
       }
-    ]
+    ],
+    "fixedFooter": {
+      "primaryButton": {
+        "text": "サスケ 監視ツール - ミカゲ",
+        "color": {
+          "red": 0.3686274509803922,
+          "green": 0.6470588235294118,
+          "blue": 0,
+          "alpha": 1
+        },
+        "icon": {
+          "materialIcon": {
+            "name": "open_in_new"
+          }
+        },
+        "onClick": {
+          "openLink": {
+            "url": "https://mikage.onrender.com/"
+          }
+        },
+      }
+    }
   }
   return [{
     cardId: Math.random().toString(32).substring(2),
@@ -119,6 +118,7 @@ export async function createThreadGoogleChat(errors: LogResult[]) {
     ...errors.map((error) =>  `- *${error.name}* `),
   ].join("\n");
   const body = { text };
+  console.log("createThreadGoogleChat:", body);
   return await sendGoogleChatRequest(url, body);
 }
 
@@ -128,6 +128,7 @@ export async function updateThreadGoogleChat(errors: LogResult[], name: string) 
   const cardsV2 = createCardsV2(errors);
   const text = "⚠️インシデント 発生中";
   const body = { text, cardsV2, thread: { name } };
+  console.log("updateThreadGoogleChat:", body);
   return await sendGoogleChatRequest(url, body);
 }
 
@@ -136,5 +137,6 @@ export async function resolveThreadGoogleChat(errors: LogResult[], name: string)
   const url = `${googleChatWebhookUrl}&messageReplyOption=REPLY_MESSAGE_OR_FAIL`;
   const text = "✅インシデント 終了";
   const body = { text, thread: { name } };
+  console.log("resolveThreadGoogleChat:", body);
   return await sendGoogleChatRequest(url, body);
 }
