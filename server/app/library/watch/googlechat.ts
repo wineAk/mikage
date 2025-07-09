@@ -7,7 +7,7 @@ const headers = { "Content-Type": "application/json" };
 // CARD: https://addons.gsuite.google.com/uikit/builder?hl=ja
 // ICON: https://developers.google.com/workspace/chat/add-text-image-card-dialog#add-icon
 function createCardsV2(errors: LogResult[]) {
-  const sections = errors.map((error) => {
+  const sections = errors.flatMap((error) => {
     const { name, log } = error;
     const { responseTime, statusCode, statusMessage, errorCode, errorName } = log;
     const widgets = [
@@ -64,28 +64,39 @@ function createCardsV2(errors: LogResult[]) {
       "imageUrl": "https://cldup.com/VM41agw9eH.png",
       "imageType": "CIRCLE"
     },
-    "sections": sections,
-    "fixedFooter": {
-      "primaryButton": {
-        "text": "サスケ 監視ツール - ミカゲ",
-        "color": {
-          "red": 0.3686274509803922,
-          "green": 0.6470588235294118,
-          "blue": 0,
-          "alpha": 1
-        },
-        "icon": {
-          "materialIcon": {
-            "name": "open_in_new"
+    "sections": [
+      ...sections,
+      {
+        "widgets": [
+          {
+            "buttonList": {
+              "buttons": [
+                {
+                  "color": {
+                    // #b0cf75
+                    "red": 176/255,
+                    "green": 207/255,
+                    "blue": 117/255,
+                    "alpha": 1
+                  },
+                  "icon": {
+                    "materialIcon": {
+                      "name": "open_in_new"
+                    }
+                  },
+                  "onClick": {
+                    "openLink": {
+                      "url": "https://mikage.onrender.com/"
+                    }
+                  },
+                  "text": "サスケ 監視ツール - ミカゲ"
+                }
+              ]
+            }
           }
-        },
-        "onClick": {
-          "openLink": {
-            "url": "https://mikage.onrender.com/"
-          }
-        },
+        ]
       }
-    }
+    ]
   }
   return [{
     cardId: Math.random().toString(32).substring(2),
