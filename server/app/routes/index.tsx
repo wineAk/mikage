@@ -90,7 +90,15 @@ export default function Index({ loaderData }: Route.ComponentProps) {
 
   return (
     <>
-      <Tabs defaultValue="status">
+      <Status
+        now={now}
+        minute={minute}
+        setMinute={handleMinuteChange}
+        logs={logs}
+        targets={targets}
+      />
+     {/*
+      <Tabs defaultValue="status" className="hidden">
         <div className="fixed z-2 w-full">
           <div className="h-14 max-w-screen-xl mx-4 xl:mx-auto mt-4">
             <TabsList className="w-full h-full p-0 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl rounded-full overflow-hidden">
@@ -130,6 +138,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           </TabsContent>
         </div>
       </Tabs>
+      */}
     </>
   );
 }

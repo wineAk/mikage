@@ -86,6 +86,7 @@ export default function CardMulti({
               {targets ? (
                 <TargetsSetting
                   targets={targets}
+                  defaultRdsList={defaultRdsList}
                   rdsList={rdsList}
                   setRdsList={setRdsList}
                 />
@@ -120,11 +121,12 @@ export default function CardMulti({
 
 type TargetsSettingProps = {
   targets: Target[];
+  defaultRdsList: string[];
   rdsList: string[];
   setRdsList: (rdsList: string[]) => void;
 };
 
-function TargetsSetting({ targets, rdsList, setRdsList }: TargetsSettingProps) {
+function TargetsSetting({ targets, defaultRdsList, rdsList, setRdsList }: TargetsSettingProps) {
   return (
     <>
       <div className="flex gap-2 mb-2">
@@ -144,6 +146,9 @@ function TargetsSetting({ targets, rdsList, setRdsList }: TargetsSettingProps) {
         </Button>
         <Button size="sm" variant="outline" onClick={() => setRdsList([])}>
           全解除
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setRdsList(defaultRdsList)} className="ml-auto">
+          リセット
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-2 p-2">

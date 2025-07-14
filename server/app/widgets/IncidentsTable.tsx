@@ -95,10 +95,7 @@ function formatDateTime(date: Date): string {
   });
 }
 
-export default function IncidentsTable({
-  className,
-  targets,
-}: IncidentsTableProps) {
+export default function IncidentsTable() {
   const [offset, setOffset] = useState(0);
   const handlePrev = () => setOffset((prev) => prev + 1);
   const handleNext = () => setOffset((prev) => Math.max(0, prev - 1));
@@ -109,13 +106,17 @@ export default function IncidentsTable({
     Promise.all([
       fetch(`/api/v1/incidents/${offset}`).then((res) => res.json()),
       fetch(`/api/v1/errors/${offset}`).then((res) => res.json()),
-    ]).then(([incidentsRes, errorsRes]) => {
-      if (!incidentsRes.data || !errorsRes.data || !targets) return;
-      setError(errorsRes.data);
+      fetch("/api/v1/targets").then((res) => res.json()),
+    ]).then(([incidentsRes, errorsRes, targetsRes]) => {
+      const incidents = incidentsRes.data;
+      const errors = errorsRes.data;
+      const targets = targetsRes.data;
+      if (!incidents || !errors || !targets) return;
+      setError(errors);
       // incidentsErrors生成
-      const filteredIncidents = incidentsRes.data.reduce(
+      const filteredIncidents = incidents.reduce(
         (acc: IncidentError[], incident: Incident) => {
-          const filtered = getFilteredErrors(incident, errorsRes.data.logs);
+          const filtered = getFilteredErrors(incident, errors.logs);
           const groupedErrors = getGroupedErrors(filtered);
           if (hasArrayMore(groupedErrors)) {
             acc.push({ ...incident, errors: filtered });
@@ -158,7 +159,7 @@ export default function IncidentsTable({
   }, [offset]);
 
   return (
-    <Card className={`${className}`}>
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>サーバーダウン</span>
@@ -184,7 +185,7 @@ export default function IncidentsTable({
           </div>
         </CardTitle>
       </CardHeader>
-      {timeline && targets ? (
+      {timeline ? (
         <CardContent>
           <Timeline timeline={timeline} />
         </CardContent>
