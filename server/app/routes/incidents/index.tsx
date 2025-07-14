@@ -1,5 +1,5 @@
-import type { Route } from "./+types/incidents";
-import IncidentsTable from "~/widgets/IncidentsTable";
+import type { Route } from "./+types/index";
+import IncidentsTable from "./components/table";
 
 export function meta({}: Route.MetaArgs) {
   return [

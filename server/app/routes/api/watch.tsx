@@ -1,5 +1,5 @@
 import type { Route } from "./+types/watch";
-import { createClient } from "~/library/supabase/server";
+import { createClient } from "~/lib/supabase";
 import { isNetworkAvailable, checkTarget } from "~/library/watch/checkTarget";
 import {
   createIncidentInstatus,

@@ -4,7 +4,7 @@ import { createRequestHandler } from "@react-router/express";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
-import { createClient } from "./app/library/supabase/server.js";
+import { createClient } from "./app/lib/supabase";
 
 // .envファイルから環境変数を読み込み
 dotenv.config();

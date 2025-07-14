@@ -42,7 +42,7 @@ type CardMultiChartsProps = {
   rdsList: string[];
 };
 
-export default function CardMultiCharts({
+export default function Charts({
   targets,
   margeLogs,
   rdsList,

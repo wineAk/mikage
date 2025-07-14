@@ -8,12 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import CardMulti from "~/widgets/CardMulti";
-import ErrorsTable from "~/widgets/ErrorsTable";
-import SummaryTable from "~/widgets/SummaryTable";
-import Login from "~/widgets/Login";
-import IncidentsTable from "~/widgets/IncidentsTable";
+import ChartsCard from "./components/charts-card";
+import SummaryCard from "./components/summary-card";
 import { useInterval } from "~/library/index/useInterval";
 
 export function meta({}: Route.MetaArgs) {
@@ -61,10 +57,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   useEffect(() => {
     if (!minute) setMinute("60*1");
   }, []);
-  // minute変更ハンドラ
-  const handleMinuteChange = (value: string) => {
-    setMinute(value);
-  };
 
   // targetを管理
   const [targets, setTargets] = useState<Target[] | null>(null);
@@ -88,71 +80,6 @@ export default function Index({ loaderData }: Route.ComponentProps) {
       .then((res) => setLogs(res.data));
   }, [now, minute, targets]);
 
-  return (
-    <>
-      <Status
-        now={now}
-        minute={minute}
-        setMinute={handleMinuteChange}
-        logs={logs}
-        targets={targets}
-      />
-     {/*
-      <Tabs defaultValue="status" className="hidden">
-        <div className="fixed z-2 w-full">
-          <div className="h-14 max-w-screen-xl mx-4 xl:mx-auto mt-4">
-            <TabsList className="w-full h-full p-0 bg-background/50 backdrop-blur-sm border dark:border-slate-700/70 max-w-screen-xl rounded-full overflow-hidden">
-              {["status", "incidents", "errors", "login"].map((tab) => (
-                <TabsTrigger
-                  key={tab}
-                  value={tab}
-                  className="h-full rounded-none cursor-pointer hover:bg-neutral-100/50 data-[state=active]:bg-neutral-200/50 data-[state=active]:shadow-none"
-                  onClick={() => {
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                >
-                  {tab}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-        </div>
-        <div className="mt-18 p-4">
-          <TabsContent value="status">
-            <Status
-              now={now}
-              minute={minute}
-              setMinute={handleMinuteChange}
-              logs={logs}
-              targets={targets}
-            />
-          </TabsContent>
-          <TabsContent value="incidents">
-            <IncidentsTable targets={targets} />
-          </TabsContent>
-          <TabsContent value="errors">
-            <ErrorsTable />
-          </TabsContent>
-          <TabsContent value="login">
-            <Login targets={targets} />
-          </TabsContent>
-        </div>
-      </Tabs>
-      */}
-    </>
-  );
-}
-
-// StatusProps型
-type StatusProps = {
-  now: string;
-  minute: string | undefined;
-  setMinute: (value: string) => void;
-  logs: Key[] | null;
-  targets: Target[] | null;
-};
-
-function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
   return (
     <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
       <div className="col-span-1 md:col-span-2 xl:col-span-4">
@@ -205,19 +132,19 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
           </Select>
         </section>
       </div>
-      <CardMulti
+      <ChartsCard
         title="ホームページ"
         logs={logs}
         targets={targets}
         defaultRdsList={["web_interpark", "web_saaske", "web_works"]}
       />
-      <CardMulti
+      <ChartsCard
         title="Works"
         logs={logs}
         targets={targets}
         defaultRdsList={["works07", "works09"]}
       />
-      <CardMulti
+      <ChartsCard
         title="サスケ"
         className="col-span-1 md:col-span-2"
         logs={logs}
@@ -230,7 +157,7 @@ function Status({ now, minute, setMinute, logs, targets }: StatusProps) {
           "saaske_api",
         ]}
       />
-      <SummaryTable
+      <SummaryCard
         className="col-span-1 md:col-span-2 xl:col-span-4"
         logs={logs}
       />

@@ -1,5 +1,5 @@
 import type { Route } from "./+types/errors";
-import { createClient } from "~/library/supabase/server";
+import { createClient } from "~/lib/supabase";
 
 export async function loader({ request }: Route.LoaderArgs) {
   // データ取得

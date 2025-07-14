@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "~/components/ui/table";
 
-import SpinnerCircleLarge from "./SpinnerCircleLarge";
+import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 type Stats = { max: number; min: number; avg: number; median: number };

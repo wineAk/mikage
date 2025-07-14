@@ -1,5 +1,5 @@
 import type { Route } from "./+types/keys";
-import { createClient } from "~/library/supabase/server";
+import { createClient } from "~/lib/supabase";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // パラメータを取得

@@ -16,9 +16,8 @@ import {
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 
-import CardMultiCharts from "./CardMultiCharts";
-import SpinnerCircle from "./SpinnerCircle";
-import SpinnerCircleLarge from "./SpinnerCircleLarge";
+import Charts from "./charts";
+import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 const SAASKE_SAVE_KEY = "saaske_rds_list";
@@ -48,7 +47,7 @@ function mergeLogs(keys: string[], logs: Key[]): MargeLog[] {
   return Array.from(margeLogs.values());
 }
 
-type CardMultiProps = {
+type ChartsCardProps = {
   title: string;
   className?: string;
   logs: Key[] | null;
@@ -56,13 +55,13 @@ type CardMultiProps = {
   defaultRdsList: string[];
 };
 
-export default function CardMulti({
+export default function ChartsCard({
   title,
   className,
   logs,
   targets,
   defaultRdsList,
-}: CardMultiProps) {
+}: ChartsCardProps) {
   const [rdsList, setRdsList] = useState<string[]>([]);
   const colorLists = getColorListsFromKey(defaultRdsList[0]);
   const margeLogs = logs ? mergeLogs(rdsList, logs) : null;
@@ -92,7 +91,7 @@ export default function CardMulti({
         </CardTitle>
       </CardHeader>
       {margeLogs && targets ? (
-        <CardMultiCharts
+        <Charts
           targets={targets}
           margeLogs={margeLogs}
           rdsList={rdsList}

@@ -1,5 +1,5 @@
 import type { Route } from "./+types/key";
-import { createClient } from "~/library/supabase/server";
+import { createClient } from "~/lib/supabase";
 import LoginCard from "./components/card";
 
 export function meta({ data }: Route.MetaArgs) {

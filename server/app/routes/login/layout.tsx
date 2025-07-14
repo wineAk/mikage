@@ -5,7 +5,7 @@ import { NavLink, Outlet } from "react-router";
 import { getColorListsFromKey } from "~/library/index/color";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import SpinnerCircleLarge from "~/widgets/SpinnerCircleLarge";
+import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 
 export default function LoginLayout() {
   const [targets, setTargets] = useState<Target[] | null>(null);

@@ -19,7 +19,7 @@ import {
   SquareArrowOutUpRight,
 } from "lucide-react";
 
-import SpinnerCircleLarge from "./SpinnerCircleLarge";
+import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 type IncidentsTableProps = {
