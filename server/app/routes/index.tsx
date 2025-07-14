@@ -18,7 +18,7 @@ import { useInterval } from "~/library/index/useInterval";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "サスケ 監視ツール - ミカゲ" },
+    { title: "サスケ監視ツール ミカゲ" },
     { name: "description", content: 'サスケを監視するツール"ミカゲ"です。' },
   ];
 }
