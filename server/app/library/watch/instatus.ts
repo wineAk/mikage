@@ -1,10 +1,11 @@
 const instatusURI = "https://api.instatus.com";
-const API_KEY = process.env.VITE_INSTATUS_API_KEY;
-const page_id = process.env.VITE_INSTATUS_PAGE_ID;
-const components = process.env.VITE_INSTATUS_COMPONENTS ?? "";
-const componentsList = components ? components.split(",") : [];
+const INSTATUS_API_KEY = process.env.VITE_INSTATUS_API_KEY;
+//const page_id = process.env.VITE_INSTATUS_PAGE_ID;
+//const components = process.env.VITE_INSTATUS_COMPONENTS ?? "";
+//const componentsList = components ? components.split(",") : [];
+
 const headers = {
-  Authorization: `Bearer ${API_KEY}`,
+  Authorization: `Bearer ${INSTATUS_API_KEY}`,
   "Content-Type": "application/json",
 };
 
@@ -19,49 +20,58 @@ async function sendInstatusRequest(url: string, body: any) {
 }
 
 // コンポーネントのステータス作成
-function getComponentStatuses(status: string) {
-  return componentsList.map((id) => ({ id, status }));
+function getComponentStatuses(components: string[], status: "MAJOROUTAGE" | "OPERATIONAL") {
+  const componentsList = components.map((id) => ({ id, status }));
+  return componentsList;
 }
 
 // インシデント新規作成
-export async function createIncidentInstatus(started: string) {
+type InstatusOptions = {
+  started: string;
+  page_id: string;
+  components: string[];
+}
+export async function createIncidentInstatus(options: InstatusOptions) {
+  const { started, page_id, components } = options;
   const url = `${instatusURI}/v1/${page_id}/incidents`;
   const body = {
     name: "接続しづらい状況が発生",
-    message: "一部環境において、Worksへアクセスできない状況が発生してます",
-    components: componentsList,
+    message: "一部環境においてアクセスしづらい状況が発生しております",
+    components: components,
     started,
     status: "INVESTIGATING",
     notify: true,
-    statuses: getComponentStatuses("MAJOROUTAGE"),
+    statuses: getComponentStatuses(components, "MAJOROUTAGE"),
   };
   return await sendInstatusRequest(url, body);
 }
 
 // インシデント更新
-export async function updateIncidentInstatus(incident_id: string, started: string) {
+export async function updateIncidentInstatus(incident_id: string, options: InstatusOptions) {
+  const { started, page_id, components } = options;
   const url = `${instatusURI}/v1/${page_id}/incidents/${incident_id}/incident-updates`;
   const body = {
-    message: "引き続き、Worksへアクセスしづらい状況が発生しています",
-    components: componentsList,
+    message: "引き続きアクセスしづらい状況が発生しております",
+    components: components,
     started,
     status: "MONITORING",
     notify: true,
-    statuses: getComponentStatuses("MAJOROUTAGE"),
+    statuses: getComponentStatuses(components, "MAJOROUTAGE"),
   };
   return await sendInstatusRequest(url, body);
 }
 
 // インシデント終了
-export async function resolveIncidentInstatus(incident_id: string, started: string) {
+export async function resolveIncidentInstatus(incident_id: string, options: InstatusOptions) {
+  const { started, page_id, components } = options;
   const url = `${instatusURI}/v1/${page_id}/incidents/${incident_id}/incident-updates`;
   const body = {
-    message: "サーバーが平常時に復帰いたしました",
-    components: componentsList,
+    message: "問題が解消されました",
+    components: components,
     started,
     status: "RESOLVED",
     notify: true,
-    statuses: getComponentStatuses("OPERATIONAL"),
+    statuses: getComponentStatuses(components, "OPERATIONAL"),
   };
   return await sendInstatusRequest(url, body);
 }

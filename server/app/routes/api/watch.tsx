@@ -48,7 +48,6 @@ export async function loader({ request }: Route.LoaderArgs) {
   //      headers: { "Content-Type": "application/json" },
   //    });
   // }
-
   // 全ターゲットのチェックを非同期で行う
   const checkPromises = (data ?? []).map(async (target) => {
     const { key, name, url, headers } = target;
@@ -716,17 +715,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     results: LogResult[],
     key: RegExp
   ): LogResult[] {
-    return results.filter((result) =>
-      key.test(result.key) &&
-      (result.log.statusCode !== 200 ||
-        (result.log.errorCode !== null &&
-          result.log.errorCode !== "NO_INTERNET"))
-    );
+    return results.filter((result) => {
+      const keyMatches = key.test(result.key);
+      const isErrorStatus = result.log.statusCode !== 200;
+      const hasActionableError  = result.log.errorCode !== null && result.log.errorCode !== "NO_INTERNET";
+      return keyMatches && (isErrorStatus || hasActionableError);
+    });
   }
 
   // インシデントを更新する関数
   async function handleIncident(
-    label: string,
+    label: "saaske" | "saaske_api" | "saaske_webform" | "saaske_webtracking" | "saaske_other" | "works" | "web",
     errors: LogResult[],
     incident: Incidents | undefined
   ): Promise<any> {
@@ -734,6 +733,32 @@ export async function loader({ request }: Route.LoaderArgs) {
     const now = new Date();
     // 結果
     let supabaseResult, googleChatResult, instatusResult;
+    
+    // Instatusの環境変数
+    const INSTATUS_SAASKE_PAGE_ID = process.env.VITE_INSTATUS_SAASKE_PAGE_ID as string;
+    const INSTATUS_SAASKE_COMPONENT_API = process.env.VITE_INSTATUS_SAASKE_COMPONENT_API as string;
+    const INSTATUS_SAASKE_COMPONENT_CTI = process.env.VITE_INSTATUS_SAASKE_COMPONENT_CTI as string;
+    const INSTATUS_SAASKE_COMPONENT_SAASKE = process.env.VITE_INSTATUS_SAASKE_COMPONENT_SAASKE as string;
+    const INSTATUS_SAASKE_COMPONENT_WEBFORM = process.env.VITE_INSTATUS_SAASKE_COMPONENT_WEBFORM as string;
+    const INSTATUS_WORKS_PAGE_ID = process.env.VITE_INSTATUS_WORKS_PAGE_ID as string;
+    const INSTATUS_WORKS_COMPONENT_WORKS = process.env.VITE_INSTATUS_WORKS_COMPONENT_WORKS as string;
+    // Instatusのオプション変数
+    let page_id = "";
+    let component = "";
+    switch (label) {
+      case "saaske":
+        page_id = INSTATUS_SAASKE_PAGE_ID;
+        component = INSTATUS_SAASKE_COMPONENT_SAASKE;
+        break;
+      case "saaske_api":
+        page_id = INSTATUS_SAASKE_PAGE_ID;
+        component = INSTATUS_SAASKE_COMPONENT_API;
+        break;
+      case "works":
+        page_id = INSTATUS_WORKS_PAGE_ID;
+        component = INSTATUS_WORKS_COMPONENT_WORKS;
+        break;
+    }
 
     // エラーがある
     if (errors.length > 0) {
@@ -763,17 +788,32 @@ export async function loader({ request }: Route.LoaderArgs) {
           googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
           console.log("updateThreadGoogleChat", googleChatResult);
         }
-        // WorksのみInstatusへ通知（更新は5回に1回）
-        if (label === "works" && !instatus_id  && errorCount === 2 ) {
-          console.log(`${label} Instatusへ通知`);
-          const started = new Date(created_at).toISOString(); // 初回のみ作成日時を利用
-          instatusResult = await createIncidentInstatus(started);
-          console.log("createIncidentInstatus", instatusResult);
-        } else if (label === "works" && instatus_id && errorCount % 5 === 0) {
-          console.log(`${label} Instatusを更新`);
-          const started = new Date(updated_at).toISOString(); // 2回目以降は前回更新日時を利用
-          instatusResult = await updateIncidentInstatus(instatus_id, started);
-          console.log("updateIncidentInstatus", instatusResult);
+        // saaskeまたはworksの場合はInstatusへ通知
+        if (label === "saaske" || label === "saaske_api" || label === "works") {
+          // 2回目のみ作成
+          if (!instatus_id  && errorCount === 2) {
+            console.log(`${label} Instatusへ通知`);
+            const started = new Date(created_at).toISOString(); // 初回のみ作成日時を利用
+            const instatusOptions = {
+              started: started,
+              page_id: page_id,
+              components: [component],
+            };
+            instatusResult = await createIncidentInstatus(instatusOptions);
+            console.log("createIncidentInstatus", instatusResult);
+          }
+          // 2回目以降は5回に1回更新
+          else if (instatus_id && errorCount % 5 === 0) {
+            console.log(`${label} Instatusを更新`);
+            const started = new Date(updated_at).toISOString(); // 2回目以降は前回更新日時を利用
+            const instatusOptions = {
+              started: started,
+              page_id: page_id,
+              components: [component],
+            };
+            instatusResult = await updateIncidentInstatus(instatus_id, instatusOptions);
+            console.log("updateIncidentInstatus", instatusResult);
+          }
         }
         // Supabaseを更新
         supabaseResult = await supabase
@@ -803,7 +843,12 @@ export async function loader({ request }: Route.LoaderArgs) {
         if (instatus_id) {
           console.log(`${label} Instatusを終了`);
           const started = new Date(now).toISOString(); // 終了ときは現在の日時を利用
-          instatusResult = await resolveIncidentInstatus(instatus_id, started);
+          const instatusOptions = {
+            started: started,
+            page_id: page_id,
+            components: [component],
+          };
+          instatusResult = await resolveIncidentInstatus(instatus_id, instatusOptions);
           console.log("resolveIncidentInstatus", instatusResult);
         }
         // Supabaseを更新
@@ -830,32 +875,74 @@ export async function loader({ request }: Route.LoaderArgs) {
     .select("*")
     .is("is_closed", null);
 
-  const saaskeErrors = findErrorResults(results, /^saaske(\\d+|_.*)$/);
+  // サスケ saaske00～saaske09
+  const saaskeMainErrors = findErrorResults(results, /^saaske(\d+)$/);
+  const saaskeMainIncident = incidents?.find((i) => i.keyword === "saaske");
+  const saaskeMainResult = await handleIncident(
+    "saaske",
+    saaskeMainErrors,
+    saaskeMainIncident
+  );
+  // サスケAPI saaske_api
+  const saaskeApiErrors = findErrorResults(results, /^saaske_api$/);
+  const saaskeApiIncident = incidents?.find((i) => i.keyword === "saaske_api");
+  const saaskeApiResult = await handleIncident(
+    "saaske_api",
+    saaskeApiErrors,
+    saaskeApiIncident
+  );
+  // サスケWebフォーム saaske_webform
+  const saaskeWebformErrors = findErrorResults(results, /^saaske_webform$/);
+  const saaskeWebformIncident = incidents?.find((i) => i.keyword === "saaske_webform");
+  const saaskeWebformResult = await handleIncident(
+    "saaske_webform",
+    saaskeWebformErrors,
+    saaskeWebformIncident
+  );
+  // サスケWeb行動解析 saaske_webtracking、saaske_webtracking_v2
+  const saaskeWebtrackingErrors = findErrorResults(results, /^saaske_webtracking(_v2)?$/);
+  const saaskeWebtrackingIncident = incidents?.find((i) => i.keyword === "saaske_webtracking");
+  const saaskeWebtrackingResult = await handleIncident(
+    "saaske_webtracking",
+    saaskeWebtrackingErrors,
+    saaskeWebtrackingIncident
+  );
+  // サスケ その他 saaske_*
+  const saaskeOtherErrors = findErrorResults(results, /^saaske_.*$/);
+  const saaskeOtherIncident = incidents?.find((i) => i.keyword === "saaske_other");
+  const saaskeOtherResult = await handleIncident(
+    "saaske_other",
+    saaskeOtherErrors,
+    saaskeOtherIncident
+  );
+  // Works works07～works09
   const worksErrors = findErrorResults(results, /^works\\d+$/);
-  const webErrors = findErrorResults(results, /^web_.*$/);
-
-  const saaskeIncident = incidents?.find((i) => i.keyword === "saaske");
   const worksIncident = incidents?.find((i) => i.keyword === "works");
-  const webIncident = incidents?.find((i) => i.keyword === "web");
-
-  // 呼び出し
   const worksResult = await handleIncident(
     "works",
     worksErrors,
     worksIncident
   );
-  const saaskeResult = await handleIncident(
-    "saaske",
-    saaskeErrors,
-    saaskeIncident
-  );
+  // WEBサイト web_*
+  const webErrors = findErrorResults(results, /^web_.*$/);
+  const webIncident = incidents?.find((i) => i.keyword === "web");
   const webResult = await handleIncident(
     "web",
     webErrors,
     webIncident
   );
 
-  return new Response(JSON.stringify({ results, worksResult, saaskeResult, webResult }), {
+  const resultsAll = {
+    results: results,
+    works: worksResult,
+    saaske: saaskeMainResult,
+    saaske_api: saaskeApiResult,
+    saaske_webform: saaskeWebformResult,
+    saaske_webtracking: saaskeWebtrackingResult,
+    saaske_other: saaskeOtherResult,
+    web: webResult,
+  };
+  return new Response(JSON.stringify({ resultsAll }), {
     headers: { "Content-Type": "application/json" },
   });
 }
