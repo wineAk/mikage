@@ -15,6 +15,7 @@ const PORT = 80;
 
 // ALLOWED_IPS（カンマ区切り）を配列に
 const allowedIps = (process.env.ALLOWED_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean);
+console.log('allowedIps:', allowedIps);
 
 // IP制御ミドルウェア（staticルートより前に）
 app.use((req, res, next) => {
