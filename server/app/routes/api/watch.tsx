@@ -92,6 +92,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const INSTATUS_SAASKE_COMPONENT_CTI = process.env.VITE_INSTATUS_SAASKE_COMPONENT_CTI as string;
     const INSTATUS_SAASKE_COMPONENT_SAASKE = process.env.VITE_INSTATUS_SAASKE_COMPONENT_SAASKE as string;
     const INSTATUS_SAASKE_COMPONENT_WEBFORM = process.env.VITE_INSTATUS_SAASKE_COMPONENT_WEBFORM as string;
+    const INSTATUS_SAASKE_COMPONENT_WEBTRACKING = process.env.VITE_INSTATUS_SAASKE_COMPONENT_WEBTRACKING as string;
     const INSTATUS_WORKS_PAGE_ID = process.env.VITE_INSTATUS_WORKS_PAGE_ID as string;
     const INSTATUS_WORKS_COMPONENT_WORKS = process.env.VITE_INSTATUS_WORKS_COMPONENT_WORKS as string;
     // Instatusのオプション変数
@@ -109,6 +110,10 @@ export async function loader({ request }: Route.LoaderArgs) {
       case "saaske_webform":
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_WEBFORM;
+        break;
+      case "saaske_webtracking":
+        page_id = INSTATUS_SAASKE_PAGE_ID;
+        component = INSTATUS_SAASKE_COMPONENT_WEBTRACKING;
         break;
       case "works":
         page_id = INSTATUS_WORKS_PAGE_ID;
