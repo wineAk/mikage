@@ -106,6 +106,10 @@ export async function loader({ request }: Route.LoaderArgs) {
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_API;
         break;
+      case "saaske_webform":
+        page_id = INSTATUS_SAASKE_PAGE_ID;
+        component = INSTATUS_SAASKE_COMPONENT_WEBFORM;
+        break;
       case "works":
         page_id = INSTATUS_WORKS_PAGE_ID;
         component = INSTATUS_WORKS_COMPONENT_WORKS;
