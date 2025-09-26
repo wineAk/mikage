@@ -141,7 +141,7 @@ export async function loader({ request }: Route.LoaderArgs) {
           console.log("updateThreadGoogleChat", googleChatResult);
         }
         // saaskeまたはworksの場合はInstatusへ通知
-        if (label === "saaske" || label === "saaske_api" || label === "works") {
+        if (page_id !== "" && component !== "") {
           // 2回目のみ作成
           if (!instatus_id  && errorCount === 2) {
             console.log(`${label} Instatusへ通知`);
