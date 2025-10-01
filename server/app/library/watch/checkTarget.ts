@@ -53,10 +53,24 @@ export async function checkTarget({ url, headers }: Target) {
     log.responseTime = total ?? null;
     log.statusCode = statusCode;
     log.statusMessage = statusMessage ?? null;
-    // console.log(
-    //   "🧐 確認の為にBodyを表示\n",
-    //   body.replace(/\s+/g, " ").trim().slice(0, 140)
-    // );
+    //const trimBody = body.replace(/\s+/g, " ").trim().slice(0, 140);
+    //console.log("🧐 確認の為にBodyを表示\n", trimBody);
+    if (/api\.saaske\.com/.test(url)) {
+      try {
+        const json = JSON.parse(body);
+      } catch (error) {
+        console.log("APIのエラー", error);
+        const message =
+          // 標準Error系
+          (error instanceof Error) ? error.message : 
+          // 文字列throw対策
+          (typeof error === 'string') ? error :
+          // その他
+          String((error as any).message);
+        log.errorCode = "INVALID_JSON";
+        log.errorName = message;
+      }
+    }
     const errorMatch = body.match(/\[ ?code[：:]\s*(\d+)\s*\]/i);
     if (errorMatch) {
       log.errorCode = `CODE_${errorMatch[1]}`;
