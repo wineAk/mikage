@@ -55,7 +55,9 @@ export async function checkTarget({ url, headers }: Target) {
     log.statusMessage = statusMessage ?? null;
     //const trimBody = body.replace(/\s+/g, " ").trim().slice(0, 140);
     //console.log("🧐 確認の為にBodyを表示\n", trimBody);
-    if (/api\.saaske\.com/.test(url)) {
+
+    // ステータスが200かつAPIの場合はJSONが返却されるか確認する
+    if (statusCode === 200 && /api\.saaske\.com/.test(url)) {
       try {
         const json = JSON.parse(body);
       } catch (error) {
