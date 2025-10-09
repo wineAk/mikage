@@ -176,6 +176,10 @@ export async function loader({ request }: Route.LoaderArgs) {
             console.log("updateIncidentInstatus", instatusResult);
           }
         }
+        // instatusから返却されるIDは必ずしも親ではない
+        const incidentUpdateId = instatusResult?.id; // インシデント更新時のID
+        const incidentParentId = instatusResult?.incident?.id; // インシデントの親ID
+        const instatusId = incidentParentId ?? incidentUpdateId; // 親がなければ子IDを利用（新規時など）
         // Supabaseを更新
         supabaseResult = await supabase
           .from(SUPABASE_TABLE_INCIDENTS)
@@ -183,7 +187,7 @@ export async function loader({ request }: Route.LoaderArgs) {
             count: errorCount,
             updated_at: now,
             googlechat_name: googleChatResult?.thread?.name,
-            instatus_id: instatusResult?.id,
+            instatus_id: instatusId,
           })
           .eq("id", id);
       }
