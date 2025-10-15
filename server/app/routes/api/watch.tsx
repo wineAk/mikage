@@ -141,20 +141,6 @@ export async function loader({ request }: Route.LoaderArgs) {
         const { id, keyword, created_at, updated_at, count, is_closed, googlechat_name, instatus_id } = incident;
         const errorCount = count + 1;
         console.log(`${label} エラー${errorCount}回目`);
-        // Google Chatへ通知
-        if (!googlechat_name) {
-          console.log(`${label} Google Chatへ通知`);
-          // チャットのみ送信
-          googleChatResult = await createThreadGoogleChat(errors);
-          console.log("createThreadGoogleChat", googleChatResult);
-          // スレッドに詳細を送信
-          googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
-          console.log("updateThreadGoogleChat", googleChatResult);
-        } else {
-          console.log(`${label} Google Chatを更新`);
-          googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
-          console.log("updateThreadGoogleChat", googleChatResult);
-        }
         // saaskeまたはworksの場合はInstatusへ通知
         if (page_id !== "" && component !== "") {
           // 2回目のみ作成
@@ -187,6 +173,21 @@ export async function loader({ request }: Route.LoaderArgs) {
         const incidentUpdateId = instatusResult?.id; // インシデント更新時のID
         const incidentParentId = instatusResult?.incident?.id; // インシデントの親ID
         const instatusId = incidentParentId ?? incidentUpdateId; // 親がなければ子IDを利用（新規時など）
+        const instatusUrl = `https://${label === "works" ? "works" : "saaske"}.instatus.com/${instatusId}`;
+        // Google Chatへ通知
+        if (!googlechat_name) {
+          console.log(`${label} Google Chatへ通知`);
+          // チャットのみ送信
+          googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
+          console.log("createThreadGoogleChat", googleChatResult);
+          // スレッドに詳細を送信
+          googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
+          console.log("updateThreadGoogleChat", googleChatResult);
+        } else {
+          console.log(`${label} Google Chatを更新`);
+          googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
+          console.log("updateThreadGoogleChat", googleChatResult);
+        }
         // Supabaseを更新
         supabaseResult = await supabase
           .from(SUPABASE_TABLE_INCIDENTS)

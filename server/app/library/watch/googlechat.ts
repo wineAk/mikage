@@ -51,8 +51,8 @@ function createCardsV2(errors: LogResult[]) {
       },
     ];
     const section = {
-      "collapsible": true,
-      "uncollapsibleWidgetsCount": 1,
+      //"collapsible": true,
+      //"uncollapsibleWidgetsCount": 1,
       "widgets": widgets,
     }
     return section;
@@ -115,10 +115,11 @@ export async function sendGoogleChatRequest(url: string, body: any) {
 }
 
 // スレッド新規作成
-export async function createThreadGoogleChat(errors: LogResult[]) {
+export async function createThreadGoogleChat(errors: LogResult[], instatusUrl: string) {
   const url = `${googleChatWebhookUrl}`;
   const text = [
     "🚨インシデント 発生",
+    `<${instatusUrl}|Instatusを開く>`,
     "",
     ...errors.map((error) =>  `- *${error.name}* `),
   ].join("\n");
