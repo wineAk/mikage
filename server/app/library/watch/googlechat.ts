@@ -117,12 +117,55 @@ export async function sendGoogleChatRequest(url: string, body: any) {
 // スレッド新規作成
 export async function createThreadGoogleChat(errors: LogResult[], instatusUrl: string | null) {
   const url = `${googleChatWebhookUrl}`;
+  const widgets = [
+    {
+      buttonList: {
+        buttons: {
+          color: {
+            // #b0cf75
+            red: 176 / 255,
+            green: 207 / 255,
+            blue: 117 / 255,
+            alpha: 1,
+          },
+          icon: { materialIcon: { name: "open_in_new" } },
+          onClick: { openLink: { url: "https://mikage.onrender.com/" } },
+          text: "サスケ 監視ツール - ミカゲ",
+        },
+      },
+    },
+  ];
+  if (instatusUrl) {
+    const textService = /works\.instatus\.com/.test(instatusUrl) ? "Works" : "Saaske";
+    widgets.push({
+      buttonList: {
+        buttons: {
+          color: {
+            // rgb(187, 255, 246)
+            red: 187 / 255,
+            green: 255 / 255,
+            blue: 246 / 255,
+            alpha: 1,
+          },
+          icon: { materialIcon: { name: "open_in_new" } },
+          onClick: { openLink: { url: instatusUrl } },
+          text: `${textService}のInstatusを開く`,
+        },
+      },
+    });
+  }
+  const cardsV2 = [
+    {
+      cardId: Math.random().toString(32).substring(2),
+      card: { sections: [{ widgets }] },
+    },
+  ];
   const text = [
     "🚨インシデント 発生",
-    instatusUrl ? `<${instatusUrl}|Instatusを開く>` : "",
+    "",
     ...errors.map((error) =>  `- *${error.name}* `),
   ].join("\n");
-  const body = { text };
+  const body = { text, cardsV2 };
   console.log("createThreadGoogleChat:", JSON.stringify(body));
   return await sendGoogleChatRequest(url, body);
 }
