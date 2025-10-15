@@ -115,12 +115,11 @@ export async function sendGoogleChatRequest(url: string, body: any) {
 }
 
 // スレッド新規作成
-export async function createThreadGoogleChat(errors: LogResult[], instatusUrl: string) {
+export async function createThreadGoogleChat(errors: LogResult[], instatusUrl: string | null) {
   const url = `${googleChatWebhookUrl}`;
   const text = [
     "🚨インシデント 発生",
-    `<${instatusUrl}|Instatusを開く>`,
-    "",
+    instatusUrl ? `<${instatusUrl}|Instatusを開く>` : "",
     ...errors.map((error) =>  `- *${error.name}* `),
   ].join("\n");
   const body = { text };

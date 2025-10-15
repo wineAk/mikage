@@ -173,7 +173,9 @@ export async function loader({ request }: Route.LoaderArgs) {
         const incidentUpdateId = instatusResult?.id; // インシデント更新時のID
         const incidentParentId = instatusResult?.incident?.id; // インシデントの親ID
         const instatusId = incidentParentId ?? incidentUpdateId; // 親がなければ子IDを利用（新規時など）
-        const instatusUrl = `https://${label === "works" ? "works" : "saaske"}.instatus.com/${instatusId}`;
+        const instatusSubDomain = label === "works" ? "works" : "saaske";
+        const instatusFullPath = `https://${instatusSubDomain}.instatus.com/${instatusId}`;
+        const instatusUrl = instatusId ? instatusFullPath : null;
         // Google Chatへ通知
         if (!googlechat_name) {
           console.log(`${label} Google Chatへ通知`);
