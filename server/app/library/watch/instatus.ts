@@ -30,12 +30,14 @@ type InstatusOptions = {
   started: string;
   page_id: string;
   components: string[];
+  serviceName?: string;
 }
 export async function createIncidentInstatus(options: InstatusOptions) {
-  const { started, page_id, components } = options;
+  const { started, page_id, components, serviceName } = options;
   const url = `${instatusURI}/v1/${page_id}/incidents`;
+  const name = serviceName ? `${serviceName}にて接続しづらい状況が発生` : "接続しづらい状況が発生";
   const body = {
-    name: "接続しづらい状況が発生",
+    name: name,
     message: "一部環境においてアクセスしづらい状況が発生しております",
     components: components,
     started,

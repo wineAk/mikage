@@ -98,26 +98,32 @@ export async function loader({ request }: Route.LoaderArgs) {
     // Instatusのオプション変数
     let page_id = "";
     let component = "";
+    let serviceName = "";
     switch (label) {
       case "saaske":
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_SAASKE;
+        serviceName = "サスケ";
         break;
       case "saaske_api":
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_API;
+        serviceName = "サスケAPI";
         break;
       case "saaske_webform":
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_WEBFORM;
+        serviceName = "Webフォーム";
         break;
       case "saaske_webtracking":
         page_id = INSTATUS_SAASKE_PAGE_ID;
         component = INSTATUS_SAASKE_COMPONENT_WEBTRACKING;
+        serviceName = "Web行動解析";
         break;
       case "works":
         page_id = INSTATUS_WORKS_PAGE_ID;
         component = INSTATUS_WORKS_COMPONENT_WORKS;
+        serviceName = "Works";
         break;
     }
 
@@ -159,6 +165,7 @@ export async function loader({ request }: Route.LoaderArgs) {
               started: started,
               page_id: page_id,
               components: [component],
+              serviceName: serviceName,
             };
             instatusResult = await createIncidentInstatus(instatusOptions);
             console.log("createIncidentInstatus", instatusResult);
