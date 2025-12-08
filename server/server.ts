@@ -17,6 +17,21 @@ const PORT = 80;
 const allowedIps = (process.env.ALLOWED_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean);
 console.log('allowedIps:', allowedIps);
 
+// XSS対策: Content Security Policy (CSP) ヘッダーを設定するミドルウェア
+app.use((req, res, next) => {
+  // CSPヘッダーを設定（XSS攻撃を緩和）
+  // プロキシの目的上、外部リソースを許可する必要があるが、可能な限り厳格に設定
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
+  );
+  // XSS Protection ヘッダー
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  // X-Content-Type-Options ヘッダー（MIMEタイプスニッフィング防止）
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  next();
+});
+
 // IP制御ミドルウェア（staticルートより前に）
 app.use((req, res, next) => {
   const reqHeadForwardedFor = req.headers["x-forwarded-for"];
@@ -44,10 +59,54 @@ app.use((req, res, next) => {
 //app.use("/assets", express.static(path.join(__dirname, "client/assets")));
 app.use(express.static(path.join(__dirname, "client")));
 
+/**
+ * XSS対策: HTMLエスケープ関数
+ * 特殊文字をHTMLエンティティに変換してXSS攻撃を防止
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * XSS対策: URLエスケープ関数
+ * URLパラメータを安全にエスケープ
+ */
+function escapeUrl(unsafe: string): string {
+  return encodeURIComponent(unsafe);
+}
+
+/**
+ * XSS対策: 外部HTMLから危険な要素を削除
+ * プロキシの目的上、完全なサニタイズは難しいが、最低限の危険要素を削除
+ */
+function sanitizeExternalHtml(html: string): string {
+  // 危険なスクリプトタグを削除（injectLockOverlayで既に無効化しているが、念のため）
+  // ただし、プロキシの目的上、完全なサニタイズは行わない
+  // CSPヘッダーとinjectLockOverlayで保護される
+  
+  // インラインイベントハンドラを削除（onclick, onerrorなど）
+  html = html.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+  html = html.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+  
+  // javascript:プロトコルを無効化
+  html = html.replace(/javascript:/gi, '');
+  
+  return html;
+}
+
 // HTMLに<base>と操作禁止のスタイル・スクリプトを注入
 function injectLockOverlay(html: string, baseHref: string) {
   const headTag = /<head[^>]*>/i;
-  const baseTag = `<base href="${baseHref}">`;
+  // XSS対策: baseHrefをURLエスケープ（既にvalidateUrlで検証済みだが、念のため）
+  // ただし、baseタグのhref属性はURLなので、HTMLエスケープではなく属性値として安全に処理
+  // ダブルクォートをエスケープして属性値として安全にする
+  const safeBaseHref = baseHref.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  const baseTag = `<base href="${safeBaseHref}">`;
   const styleScript = `
     <style>
       html, body {
@@ -275,7 +334,9 @@ app.get("/:key", async (req, res, next) => {
     const urlValidation = validateUrl(url);
     if (!urlValidation.valid) {
       console.error("SSRF Protection: Invalid URL detected", { url, error: urlValidation.error });
-      res.status(400).send(`❌ 無効なURLです: ${urlValidation.error}`);
+      // XSS対策: エラーメッセージをエスケープ
+      const escapedError = escapeHtml(urlValidation.error || "不明なエラー");
+      res.status(400).send(`❌ 無効なURLです: ${escapedError}`);
       return;
     }
     
@@ -301,7 +362,9 @@ app.get("/:key", async (req, res, next) => {
           const redirectValidation = validateUrl(location);
           if (!redirectValidation.valid) {
             console.error("SSRF Protection: Invalid redirect URL detected", { location, error: redirectValidation.error });
-            res.status(400).send(`❌ 無効なリダイレクト先URLです: ${redirectValidation.error}`);
+            // XSS対策: エラーメッセージをエスケープ
+            const escapedError = escapeHtml(redirectValidation.error || "不明なエラー");
+            res.status(400).send(`❌ 無効なリダイレクト先URLです: ${escapedError}`);
             return;
           }
           // リダイレクト先が有効な場合、再度fetch（最大1回まで）
@@ -326,11 +389,13 @@ app.get("/:key", async (req, res, next) => {
             return;
           }
           
+          // XSS対策: 外部HTMLをサニタイズ
+          body = sanitizeExternalHtml(body);
           body = injectLockOverlay(body, location);
-          res.set(
-            "Content-Type",
-            finalResponse.headers.get("content-type") || "text/html"
-          );
+          
+          // Content-TypeがHTMLの場合のみ処理
+          const contentType = finalResponse.headers.get("content-type") || "text/html";
+          res.set("Content-Type", contentType);
           res.status(finalResponse.status);
           res.send(body);
           return;
@@ -346,11 +411,13 @@ app.get("/:key", async (req, res, next) => {
         return;
       }
       
+      // XSS対策: 外部HTMLをサニタイズ
+      body = sanitizeExternalHtml(body);
       body = injectLockOverlay(body, url);
-      res.set(
-        "Content-Type",
-        response.headers.get("content-type") || "text/html"
-      );
+      
+      // Content-TypeがHTMLの場合のみ処理
+      const contentType = response.headers.get("content-type") || "text/html";
+      res.set("Content-Type", contentType);
       res.status(response.status);
       res.send(body);
     } catch (error) {
