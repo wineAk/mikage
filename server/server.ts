@@ -114,6 +114,138 @@ function injectLockOverlay(html: string, baseHref: string) {
     .replace(headTag, (match) => `${match}\n${styleScript}`);
 }
 
+/**
+ * SSRF対策: URL検証関数
+ * 許可されたスキームとホストのみを許可し、プライベートIPアドレスをブロック
+ */
+function validateUrl(urlString: string): { valid: boolean; error?: string } {
+  try {
+    const url = new URL(urlString);
+    
+    // 1. スキーム検証: httpsのみ許可
+    const allowedSchemes = ['https:'];
+    if (!allowedSchemes.includes(url.protocol)) {
+      return { 
+        valid: false, 
+        error: `許可されていないスキームです: ${url.protocol}` 
+      };
+    }
+
+    // 2. ホスト名の検証
+    const hostname = url.hostname;
+    
+    // 3. プライベートIPアドレスとローカルホストのブロック
+    const privateIpPatterns = [
+      /^127\./,           // 127.0.0.0/8
+      /^10\./,            // 10.0.0.0/8
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // 172.16.0.0/12
+      /^192\.168\./,      // 192.168.0.0/16
+      /^169\.254\./,      // 169.254.0.0/16 (リンクローカル)
+      /^0\.0\.0\.0$/,     // 0.0.0.0
+      /^localhost$/i,     // localhost
+    ];
+
+    // IPv6プライベートアドレスのパターン
+    const privateIpv6Patterns = [
+      /^::1$/,            // IPv6 localhost
+      /^::ffff:127\./,     // IPv4-mapped IPv6 localhost
+      /^fc00:/i,          // IPv6 プライベート (fc00::/7)
+      /^fd00:/i,          // IPv6 プライベート (fd00::/8)
+      /^fe80:/i,          // IPv6 リンクローカル (fe80::/10)
+      /^ff00:/i,          // IPv6 マルチキャスト (ff00::/8)
+    ];
+
+    // IPアドレス形式かどうかをチェック
+    const isIpv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
+    const isIpv6 = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(hostname) ||
+                   /^\[([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}\]$/.test(hostname);
+    
+    if (isIpv4) {
+      // IPv4アドレスの場合、プライベートIPかチェック
+      for (const pattern of privateIpPatterns) {
+        if (pattern.test(hostname)) {
+          return { 
+            valid: false, 
+            error: `プライベートIPアドレスまたはlocalhostは許可されていません: ${hostname}` 
+          };
+        }
+      }
+      // すべてのIPアドレス形式をブロック（ホワイトリストがない場合）
+      const allowedHosts = (process.env.ALLOWED_HOSTS || "")
+        .split(",")
+        .map(h => h.trim())
+        .filter(Boolean);
+      if (allowedHosts.length === 0) {
+        return { 
+          valid: false, 
+          error: `IPアドレス形式のURLは許可されていません: ${hostname}` 
+        };
+      }
+    } else if (isIpv6) {
+      // IPv6アドレスの場合、プライベートIPかチェック
+      const normalizedHostname = hostname.replace(/^\[|\]$/g, '');
+      for (const pattern of privateIpv6Patterns) {
+        if (pattern.test(normalizedHostname)) {
+          return { 
+            valid: false, 
+            error: `プライベートIPv6アドレスは許可されていません: ${hostname}` 
+          };
+        }
+      }
+      // すべてのIPv6アドレス形式をブロック（ホワイトリストがない場合）
+      const allowedHosts = (process.env.ALLOWED_HOSTS || "")
+        .split(",")
+        .map(h => h.trim())
+        .filter(Boolean);
+      if (allowedHosts.length === 0) {
+        return { 
+          valid: false, 
+          error: `IPv6アドレス形式のURLは許可されていません: ${hostname}` 
+        };
+      }
+    } else {
+      // ホスト名の場合、localhostをブロック
+      if (privateIpPatterns.some(pattern => pattern.test(hostname))) {
+        return { 
+          valid: false, 
+          error: `localhostは許可されていません: ${hostname}` 
+        };
+      }
+    }
+
+    // 4. オプション: 環境変数でホワイトリストが設定されている場合は検証
+    const allowedHosts = (process.env.ALLOWED_HOSTS || "")
+      .split(",")
+      .map(h => h.trim())
+      .filter(Boolean);
+    
+    if (allowedHosts.length > 0) {
+      const hostMatches = allowedHosts.some(allowedHost => {
+        // 完全一致またはワイルドカード対応（例: *.example.com）
+        if (allowedHost.startsWith("*.")) {
+          const domain = allowedHost.slice(2);
+          return hostname === domain || hostname.endsWith(`.${domain}`);
+        }
+        return hostname === allowedHost;
+      });
+      
+      if (!hostMatches) {
+        return { 
+          valid: false, 
+          error: `許可されていないホストです: ${hostname}` 
+        };
+      }
+    }
+
+    return { valid: true };
+  } catch (error) {
+    return { 
+      valid: false, 
+      error: `無効なURL形式です: ${error instanceof Error ? error.message : String(error)}` 
+    };
+  }
+}
+
 // /:key にアクセスされたときのプロキシ処理
 app.get("/:key", async (req, res, next) => {
   const key = req.params.key;
@@ -138,16 +270,98 @@ app.get("/:key", async (req, res, next) => {
     const { data } = await supabase.from("targets").select("*").eq("key", key);
     if (!data || data.length === 0) return next(); // DBに存在しないkeyはReact Routerに処理を委ねる
     const { name, url, headers } = data[0]; // 1件目を使う
-    // 接続
-    const response = await fetch(url, { headers });
-    let body = await response.text();
-    body = injectLockOverlay(body, url);
-    res.set(
-      "Content-Type",
-      response.headers.get("content-type") || "text/html"
-    );
-    res.status(response.status);
-    res.send(body);
+    
+    // SSRF対策: URL検証
+    const urlValidation = validateUrl(url);
+    if (!urlValidation.valid) {
+      console.error("SSRF Protection: Invalid URL detected", { url, error: urlValidation.error });
+      res.status(400).send(`❌ 無効なURLです: ${urlValidation.error}`);
+      return;
+    }
+    
+    // SSRF対策: タイムアウトとリダイレクト制限付きで接続
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒タイムアウト
+    
+    try {
+      const response = await fetch(url, { 
+        headers,
+        signal: controller.signal,
+        redirect: 'manual', // リダイレクトを手動で処理（SSRF対策）
+        // リダイレクト先も検証する必要がある場合は、手動で処理
+      });
+      
+      clearTimeout(timeoutId);
+      
+      // リダイレクトレスポンスの場合はエラー
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (location) {
+          // リダイレクト先も検証
+          const redirectValidation = validateUrl(location);
+          if (!redirectValidation.valid) {
+            console.error("SSRF Protection: Invalid redirect URL detected", { location, error: redirectValidation.error });
+            res.status(400).send(`❌ 無効なリダイレクト先URLです: ${redirectValidation.error}`);
+            return;
+          }
+          // リダイレクト先が有効な場合、再度fetch（最大1回まで）
+          const redirectResponse = await fetch(location, { 
+            headers,
+            signal: controller.signal,
+            redirect: 'manual',
+          });
+          // ここでは最初のリダイレクトのみ許可（無限リダイレクト防止）
+          if (redirectResponse.status >= 300 && redirectResponse.status < 400) {
+            res.status(400).send(`❌ リダイレクトが多すぎます`);
+            return;
+          }
+          // 最終的なレスポンスを使用
+          const finalResponse = redirectResponse;
+          let body = await finalResponse.text();
+          
+          // レスポンスサイズ制限（10MB）
+          const maxBodySize = 10 * 1024 * 1024; // 10MB
+          if (body.length > maxBodySize) {
+            res.status(413).send(`❌ レスポンスサイズが大きすぎます`);
+            return;
+          }
+          
+          body = injectLockOverlay(body, location);
+          res.set(
+            "Content-Type",
+            finalResponse.headers.get("content-type") || "text/html"
+          );
+          res.status(finalResponse.status);
+          res.send(body);
+          return;
+        }
+      }
+      
+      let body = await response.text();
+      
+      // レスポンスサイズ制限（10MB）
+      const maxBodySize = 10 * 1024 * 1024; // 10MB
+      if (body.length > maxBodySize) {
+        res.status(413).send(`❌ レスポンスサイズが大きすぎます`);
+        return;
+      }
+      
+      body = injectLockOverlay(body, url);
+      res.set(
+        "Content-Type",
+        response.headers.get("content-type") || "text/html"
+      );
+      res.status(response.status);
+      res.send(body);
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error("Proxy Error: Request timeout", { url });
+        res.status(504).send("❌ リクエストがタイムアウトしました");
+        return;
+      }
+      throw error; // 他のエラーは外側のcatchで処理
+    }
   } catch (error) {
     console.error("Proxy Error:", error);
     res.status(500).send("❌ 外部アクセスに失敗しました");
