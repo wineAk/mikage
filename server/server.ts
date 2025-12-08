@@ -13,6 +13,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = 80;
 
+// セキュリティ対策: X-Powered-Byヘッダーを無効化（情報漏洩防止）
+app.disable('x-powered-by');
+
 // ALLOWED_IPS（カンマ区切り）を配列に
 const allowedIps = (process.env.ALLOWED_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean);
 console.log('allowedIps:', allowedIps);
