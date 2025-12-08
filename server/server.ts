@@ -46,12 +46,14 @@ app.use((req, res, next) => {
 
 // XSS対策: Content Security Policy (CSP) ヘッダーを設定するミドルウェア
 app.use((req, res, next) => {
-  res.setHeader(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
-  );
+  // プロキシルート（/:key）では外部リソースを許可する必要があるため、CSPを緩和
   if (req.path.match(/^\/[^\/]+$/) && !req.path.startsWith('/api') && !req.path.startsWith('/login')) {
     // プロキシルート: 外部HTMLを表示するため、外部リソースを許可（XSS対策はsanitize-htmlで実現）
+    // base-uriをhttps:に変更して外部URLの<base>タグを許可
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https: fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https: fonts.gstatic.com; connect-src 'self' https:; frame-ancestors 'self'; base-uri https:; object-src 'none';"
+    );
   } else {
     // 通常ルート: 標準的なCSP
     res.setHeader(
