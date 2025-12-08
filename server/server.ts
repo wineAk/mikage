@@ -43,14 +43,58 @@ app.use((req, res, next) => {
   next();
 });
 
+// XSS対策: Content Security Policy (CSP) ヘッダーを設定するミドルウェア
+app.use((req, res, next) => {
+  // CSPヘッダーを設定（XSS攻撃を緩和）
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
+  );
+  // XSS Protection ヘッダー
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  // X-Content-Type-Options ヘッダー（MIMEタイプスニッフィング防止）
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  next();
+});
+
 // staticルートを一番最初に
 //app.use("/assets", express.static(path.join(__dirname, "client/assets")));
 app.use(express.static(path.join(__dirname, "client")));
 
+/**
+ * XSS対策: HTMLエスケープ関数
+ * 特殊文字をHTMLエンティティに変換してXSS攻撃を防止
+ */
+function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * XSS対策: 外部HTMLから危険な要素を削除
+ * プロキシの目的上、完全なサニタイズは難しいが、最低限の危険要素を削除
+ */
+function sanitizeExternalHtml(html: string): string {
+  // インラインイベントハンドラを削除（onclick, onerrorなど）
+  html = html.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+  html = html.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
+  
+  // javascript:プロトコルを無効化
+  html = html.replace(/javascript:/gi, '');
+  
+  return html;
+}
+
 // HTMLに<base>と操作禁止のスタイル・スクリプトを注入
 function injectLockOverlay(html: string, baseHref: string) {
   const headTag = /<head[^>]*>/i;
-  const baseTag = `<base href="${baseHref}">`;
+  // XSS対策: baseHrefをエスケープ（属性値として安全に処理）
+  const safeBaseHref = baseHref.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+  const baseTag = `<base href="${safeBaseHref}">`;
   const styleScript = `
     <style>
       html, body {
@@ -146,11 +190,14 @@ app.get("/:key", async (req, res, next) => {
     if (!/https:\/\/(?:(?:api|my|www|works)\.saaske\.com|(?:script\.)?secure-link\.jp|www\.interpark\.co\.jp|kensyo-tes2?\.works\.app\/)/.test(url)) return next();
     const response = await fetch(url, { headers });
     let body = await response.text();
+    
+    // XSS対策: 外部HTMLをサニタイズ
+    body = sanitizeExternalHtml(body);
     body = injectLockOverlay(body, url);
-    res.set(
-      "Content-Type",
-      response.headers.get("content-type") || "text/html"
-    );
+    
+    // Content-TypeがHTMLの場合のみ処理
+    const contentType = response.headers.get("content-type") || "text/html";
+    res.set("Content-Type", contentType);
     res.status(response.status);
     res.send(body);
   } catch (error) {
