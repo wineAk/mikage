@@ -139,6 +139,8 @@ app.get("/:key", async (req, res, next) => {
     if (!data || data.length === 0) return next(); // DBに存在しないkeyはReact Routerに処理を委ねる
     const { name, url, headers } = data[0]; // 1件目を使う
     // 接続
+    // https://(.*).saaske.com, https://(.*.).secure-link.jp, https://www.interpark.co.jp, https://(.*).works.app/ だけ許可
+    if (!/https:\/\/(?:(?:api|my|www|works)\.saaske\.com|(?:script\.)?secure-link\.jp|www\.interpark\.co\.jp|kensyo-tes2?\.works\.app\/)/.test(url)) return next();
     const response = await fetch(url, { headers });
     let body = await response.text();
     body = injectLockOverlay(body, url);
