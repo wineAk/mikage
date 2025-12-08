@@ -141,12 +141,12 @@ export async function loader({ request }: Route.LoaderArgs) {
         const { id, keyword, created_at, updated_at, count, is_closed, googlechat_name, instatus_id } = incident;
         const errorCount = count + 1;
         console.log(`${label} エラー${errorCount}回目`);
-        // saaskeまたはworksの場合はInstatusへ通知
+        // Instatusへ通知
         if (page_id !== "" && component !== "") {
-          // 2回目のみ作成
-          if (!instatus_id  && errorCount === 2) {
+          // 5回目のみInstatusを作成
+          if (!instatus_id  && errorCount === 5) {
             console.log(`${label} Instatusへ通知`);
-            const started = new Date(created_at).toISOString(); // 初回のみ作成日時を利用
+            const started = new Date(updated_at).toISOString(); // 前回更新日時を利用
             const instatusOptions = {
               started: started,
               page_id: page_id,
@@ -156,10 +156,10 @@ export async function loader({ request }: Route.LoaderArgs) {
             instatusResult = await createIncidentInstatus(instatusOptions);
             console.log("createIncidentInstatus", instatusResult);
           }
-          // 2回目以降は5回に1回更新
+          // 既にInstatusがあれば 5回毎に更新（10,15,20...）
           else if (instatus_id && errorCount % 5 === 0) {
             console.log(`${label} Instatusを更新`);
-            const started = new Date(updated_at).toISOString(); // 2回目以降は前回更新日時を利用
+            const started = new Date(updated_at).toISOString(); // 前回更新日時を利用
             const instatusOptions = {
               started: started,
               page_id: page_id,
@@ -176,19 +176,23 @@ export async function loader({ request }: Route.LoaderArgs) {
         const instatusSubDomain = label === "works" ? "works" : "saaske";
         const instatusFullPath = `https://${instatusSubDomain}.instatus.com/${instatusId}`;
         const instatusUrl = instatusId ? instatusFullPath : null;
-        // Google Chatへ通知
-        if (!googlechat_name) {
-          console.log(`${label} Google Chatへ通知`);
-          // チャットのみ送信
-          googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
-          console.log("createThreadGoogleChat", googleChatResult);
-          // スレッドに詳細を送信
-          googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
-          console.log("updateThreadGoogleChat", googleChatResult);
+        // 5回目以降にGoogle Chatへ通知
+        if (errorCount >= 5) {
+          if (!googlechat_name) {
+            console.log(`${label} Google Chatへ通知`);
+            // チャットのみ送信
+            googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
+            console.log("createThreadGoogleChat", googleChatResult);
+            // スレッドに詳細を送信
+            googleChatResult = await updateThreadGoogleChat(errors, googleChatResult?.thread?.name);
+            console.log("updateThreadGoogleChat", googleChatResult);
+          } else {
+            console.log(`${label} Google Chatを更新`);
+            googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
+            console.log("updateThreadGoogleChat", googleChatResult);
+          }
         } else {
-          console.log(`${label} Google Chatを更新`);
-          googleChatResult = await updateThreadGoogleChat(errors, googlechat_name);
-          console.log("updateThreadGoogleChat", googleChatResult);
+          console.log(`${label} Google Chat通知は ${errorCount}回目のためスキップ（5回目以降のみ通知）`);
         }
         // Supabaseを更新
         supabaseResult = await supabase
@@ -196,8 +200,8 @@ export async function loader({ request }: Route.LoaderArgs) {
           .update({
             count: errorCount,
             updated_at: now,
-            googlechat_name: googleChatResult?.thread?.name,
-            instatus_id: instatusId,
+            googlechat_name: googleChatResult?.thread?.name ?? googlechat_name,
+            instatus_id: instatusId ?? instatus_id,
           })
           .eq("id", id);
       }
