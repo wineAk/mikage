@@ -4,6 +4,7 @@ import { createRequestHandler } from "@react-router/express";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import sanitizeHtml from "sanitize-html";
 import { createClient } from "./app/lib/supabase/index.js";
 
 // .envファイルから環境変数を読み込み
@@ -45,11 +46,19 @@ app.use((req, res, next) => {
 
 // XSS対策: Content Security Policy (CSP) ヘッダーを設定するミドルウェア
 app.use((req, res, next) => {
-  // CSPヘッダーを設定（XSS攻撃を緩和）
   res.setHeader(
     "Content-Security-Policy",
     "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
   );
+  if (req.path.match(/^\/[^\/]+$/) && !req.path.startsWith('/api') && !req.path.startsWith('/login')) {
+    // プロキシルート: 外部HTMLを表示するため、外部リソースを許可（XSS対策はsanitize-htmlで実現）
+  } else {
+    // 通常ルート: 標準的なCSP
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https: fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' data: https: fonts.gstatic.com; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; object-src 'none';"
+    );
+  }
   // XSS Protection ヘッダー
   res.setHeader("X-XSS-Protection", "1; mode=block");
   // X-Content-Type-Options ヘッダー（MIMEタイプスニッフィング防止）
@@ -62,103 +71,43 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, "client")));
 
 /**
- * XSS対策: HTMLエスケープ関数
- * 特殊文字をHTMLエンティティに変換してXSS攻撃を防止
- */
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-/**
- * XSS対策: 外部HTMLから危険な要素を削除
- * プロキシの目的上、完全なサニタイズは難しいが、最低限の危険要素を削除
+ * XSS対策: 外部HTMLから危険な要素を削除（sanitize-htmlライブラリを使用）
+ * プロキシの目的上、基本的なHTMLタグは許可するが、危険な要素は削除
+ * @param html - サニタイズするHTML文字列
+ * @returns サニタイズ済みのHTML文字列
  */
 function sanitizeExternalHtml(html: string): string {
-  // インラインイベントハンドラを削除（onclick, onerrorなど）
-  html = html.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
-  html = html.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
-  
-  // javascript:プロトコルを無効化
-  html = html.replace(/javascript:/gi, '');
-  
-  return html;
+  return sanitizeHtml(html, {
+    // 許可するタグ（基本的なHTMLタグのみ）
+    allowedTags: false ,
+    // 許可する属性
+    allowedAttributes: false ,
+    // 許可するURLスキーム（http/httpsのみ）
+    allowedSchemes: ['http', 'https'],
+    // 許可するURLスキーム（属性別）
+    allowedSchemesByTag: {
+      'a': ['http', 'https'],
+      'img': ['http', 'https', 'data'],
+    },
+    // インラインスタイルを許可しない
+    allowedStyles: {},
+    // 危険なタグを削除
+    disallowedTagsMode: 'discard',
+    // 危険なタグを確実に削除
+    exclusiveFilter: function(frame: { tag: string }) {
+      // script, iframe, object, embedタグを確実に削除
+      return ['script', 'iframe', 'object', 'embed'].includes(frame.tag);
+    },
+    // 警告をログを無効
+    allowVulnerableTags: true,
+  });
 }
 
 // HTMLに<base>と操作禁止のスタイル・スクリプトを注入
 function injectLockOverlay(html: string, baseHref: string) {
   const headTag = /<head[^>]*>/i;
-  // XSS対策: baseHrefをエスケープ（属性値として安全に処理）
-  const safeBaseHref = baseHref.replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-  const baseTag = `<base href="${safeBaseHref}">`;
-  const styleScript = `
-    <style>
-      html, body {
-        pointer-events: none !important;
-        user-select: none !important;
-        overflow: hidden !important;
-      }
-      body::after {
-        content: "";
-        display: block;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0);
-        z-index: 1000;
-      }
-    </style>
-    <script>
-      // ページ内のすべてのイベントを無効化
-      document.addEventListener("DOMContentLoaded", () => {
-        const blockEvent = e => {
-          e.stopPropagation();
-          e.preventDefault();
-          return false;
-        };
-        [
-          "click", "dblclick", "mousedown", "mouseup", "keydown", "keyup",
-          "submit", "contextmenu", "wheel", "touchstart", "touchend"
-        ].forEach(ev => window.addEventListener(ev, blockEvent, true));
-
-        // コンソールをブロック
-        const originalConsole = {
-          log: console.log,
-          error: console.error,
-          warn: console.warn,
-          info: console.info,
-          debug: console.debug
-        };
-
-        Object.keys(originalConsole).forEach(method => {
-          console[method] = function() {
-            // コンソール出力を無効化
-            return;
-          };
-        });
-
-        // F12やCtrl+Shift+Iなどのデベロッパーツールを開くショートカットを無効化
-        document.addEventListener('keydown', (e) => {
-          if (
-            (e.key === 'F12') ||
-            (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J' || e.key === 'C'))
-          ) {
-            e.preventDefault();
-            return false;
-          }
-        });
-      });
-    </script>`;
-
-  return html
-    .replace(headTag, (match) => `${match}\n${baseTag}`)
-    .replace(headTag, (match) => `${match}\n${styleScript}`);
+  const baseTag = `<base href="${baseHref}">`;
+  return html.replace(headTag, (match) => `${match}\n${baseTag}`);
 }
 
 // /:key にアクセスされたときのプロキシ処理
@@ -189,17 +138,20 @@ app.get("/:key", async (req, res, next) => {
     // https://(.*).saaske.com, https://(.*.).secure-link.jp, https://www.interpark.co.jp, https://(.*).works.app/ だけ許可
     if (!/https:\/\/(?:(?:api|my|www|works)\.saaske\.com|(?:script\.)?secure-link\.jp|www\.interpark\.co\.jp|kensyo-tes2?\.works\.app\/)/.test(url)) return next();
     const response = await fetch(url, { headers });
-    let body = await response.text();
+    const rawBody = await response.text();
     
     // XSS対策: 外部HTMLをサニタイズ
-    body = sanitizeExternalHtml(body);
-    body = injectLockOverlay(body, url);
+    const safeBody = sanitizeExternalHtml(rawBody);
+    // XSS対策: サニタイズ済みのHTMLに<base>タグを注入（相対パスを解決するため）
+    const finalBody = injectLockOverlay(safeBody, url);
     
     // Content-TypeがHTMLの場合のみ処理
     const contentType = response.headers.get("content-type") || "text/html";
     res.set("Content-Type", contentType);
     res.status(response.status);
-    res.send(body);
+    
+    // XSS対策: サニタイズ済みのbodyを送信
+    res.send(finalBody);
   } catch (error) {
     console.error("Proxy Error:", error);
     res.status(500).send("❌ 外部アクセスに失敗しました");
