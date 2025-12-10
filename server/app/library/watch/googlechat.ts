@@ -66,36 +66,6 @@ function createCardsV2(errors: LogResult[]) {
     },
     "sections": [
       ...sections,
-      {
-        "widgets": [
-          {
-            "buttonList": {
-              "buttons": [
-                {
-                  "color": {
-                    // #b0cf75
-                    "red": 176/255,
-                    "green": 207/255,
-                    "blue": 117/255,
-                    "alpha": 1
-                  },
-                  "icon": {
-                    "materialIcon": {
-                      "name": "open_in_new"
-                    }
-                  },
-                  "onClick": {
-                    "openLink": {
-                      "url": "https://mikage.onrender.com/"
-                    }
-                  },
-                  "text": "サスケ 監視ツール - ミカゲ"
-                }
-              ]
-            }
-          }
-        ]
-      }
     ]
   }
   return [{
