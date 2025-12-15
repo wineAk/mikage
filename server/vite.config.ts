@@ -3,9 +3,19 @@ import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import devtoolsJson from 'vite-plugin-devtools-json';
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [tailwindcss(), reactRouter(), tsconfigPaths(), devtoolsJson()],
+  resolve: {
+    alias: {
+      "~": path.resolve(__dirname, "./app"),
+      "@": path.resolve(__dirname, "./"),
+    },
+  },
   optimizeDeps: {
     exclude: ['got'],
   },
