@@ -145,16 +145,29 @@ export async function loader({ request }: Route.LoaderArgs) {
         if (page_id !== "" && component !== "") {
           // 5回目のみInstatusを作成
           if (!instatus_id  && errorCount === 5) {
-            console.log(`${label} Instatusへ通知`);
-            const started = new Date(updated_at).toISOString(); // 前回更新日時を利用
-            const instatusOptions = {
-              started: started,
+            // Instatusを作成
+            console.log(`${label} Instatusへ通知（created_at）`);
+            const createdInstatusOptions = {
+              started: new Date(created_at).toISOString(), // 作成日時を利用
               page_id: page_id,
               components: [component],
               serviceName: serviceName,
             };
-            instatusResult = await createIncidentInstatus(instatusOptions);
+            instatusResult = await createIncidentInstatus(createdInstatusOptions);
             console.log("createIncidentInstatus", instatusResult);
+            // instatusから返却されるIDは必ずしも親ではない
+            const incidentUpdateId = instatusResult?.id; // インシデント更新時のID
+            const incidentParentId = instatusResult?.incident?.id; // インシデントの親ID
+            const instatusId = incidentParentId ?? incidentUpdateId; // 親がなければ子IDを利用（新規時など）
+            // Instatusを更新
+            console.log(`${label} Instatusを更新（updated_at）`);
+            const updatedInstatusOptions = {
+              started: new Date(updated_at).toISOString(), // 前回更新日時を利用
+              page_id: page_id,
+              components: [component],
+            };
+            instatusResult = await updateIncidentInstatus(instatusId, updatedInstatusOptions);
+            console.log("updateIncidentInstatus", instatusResult);
           }
           // 既にInstatusがあれば 5回毎に更新（10,15,20...）
           else if (instatus_id && errorCount % 5 === 0) {
