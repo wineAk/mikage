@@ -150,6 +150,60 @@ export type Database = {
         }
         Relationships: []
       }
+      watch_scheduler_lock: {
+        Row: {
+          last_reserved_slot: string
+          singleton: boolean
+        }
+        Insert: {
+          last_reserved_slot: string
+          singleton?: boolean
+        }
+        Update: {
+          last_reserved_slot?: string
+          singleton?: boolean
+        }
+        Relationships: []
+      }
+      watch_target_states: {
+        Row: {
+          error_code: string | null
+          error_name: string | null
+          failure_confirmed_at: string | null
+          first_failed_at: string | null
+          last_checked_at: string | null
+          last_reserved_at: string | null
+          response_time: number | null
+          status_code: number | null
+          status_message: string | null
+          target_key: string
+        }
+        Insert: {
+          error_code?: string | null
+          error_name?: string | null
+          failure_confirmed_at?: string | null
+          first_failed_at?: string | null
+          last_checked_at?: string | null
+          last_reserved_at?: string | null
+          response_time?: number | null
+          status_code?: number | null
+          status_message?: string | null
+          target_key: string
+        }
+        Update: {
+          error_code?: string | null
+          error_name?: string | null
+          failure_confirmed_at?: string | null
+          first_failed_at?: string | null
+          last_checked_at?: string | null
+          last_reserved_at?: string | null
+          response_time?: number | null
+          status_code?: number | null
+          status_message?: string | null
+          target_key?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -175,6 +229,14 @@ export type Database = {
       get_logs_in_range: {
         Args: { keys: string[]; start_time: string; end_time: string }
         Returns: Json
+      }
+      reserve_watch_run: {
+        Args: {
+          p_is_full_run: boolean
+          p_slot_start: string
+          p_target_keys: string[]
+        }
+        Returns: string[]
       }
     }
     Enums: {
