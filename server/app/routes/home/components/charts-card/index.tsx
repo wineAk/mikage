@@ -1,4 +1,4 @@
-import type { MargeLog } from "@/types/indexCard";
+import type { ChartRange } from "@/types/indexCard";
 import type { Key, Target } from "@/types/api";
 
 import { useState, useEffect } from "react";
@@ -17,35 +17,11 @@ import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 
 import Charts from "./charts";
+import { createChartData } from "./chartData";
 import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 const SAASKE_SAVE_KEY = "saaske_rds_list";
-
-function mergeLogs(keys: string[], logs: Key[]): MargeLog[] {
-  const margeLogs: Map<string, MargeLog> = new Map();
-  for (const key of keys) {
-    const findedLogs = logs.find((log) => log.key === key);
-    if (findedLogs) {
-      for (const log of findedLogs.logs) {
-        const { created_at, response_time } = log;
-        const created_date = new Date(created_at);
-        created_date.setSeconds(0);
-        created_date.setMilliseconds(0);
-        const created_date_str = created_date.toISOString();
-        if (margeLogs.has(created_date_str)) {
-          margeLogs.get(created_date_str)![key] = response_time ?? 0;
-        } else {
-          margeLogs.set(created_date_str, {
-            created_at: created_date_str,
-            [key]: response_time ?? 0,
-          });
-        }
-      }
-    }
-  }
-  return Array.from(margeLogs.values());
-}
 
 type ChartsCardProps = {
   title: string;
@@ -53,6 +29,7 @@ type ChartsCardProps = {
   logs: Key[] | null;
   targets: Target[] | null;
   defaultRdsList: string[];
+  range: ChartRange;
 };
 
 export default function ChartsCard({
@@ -61,10 +38,11 @@ export default function ChartsCard({
   logs,
   targets,
   defaultRdsList,
+  range,
 }: ChartsCardProps) {
-  const [rdsList, setRdsList] = useState<string[]>([]);
+  const [rdsList, setRdsList] = useState<string[]>(defaultRdsList);
   const colorLists = getColorListsFromKey(defaultRdsList[0]);
-  const margeLogs = logs ? mergeLogs(rdsList, logs) : null;
+  const chartData = logs ? createChartData(rdsList, logs) : null;
 
   useEffect(() => {
     if (title === "サスケ") {
@@ -90,11 +68,13 @@ export default function ChartsCard({
           )}
         </CardTitle>
       </CardHeader>
-      {margeLogs && targets ? (
+      {chartData && targets ? (
         <Charts
           targets={targets}
-          margeLogs={margeLogs}
-          rdsList={rdsList}
+          data={chartData.data}
+          series={chartData.series}
+          selectedKeys={rdsList}
+          range={range}
         />
       ) : (
         <SpinnerCircleLarge className={colorLists.border} />

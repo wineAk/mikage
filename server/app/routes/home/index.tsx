@@ -20,8 +20,7 @@ export function meta({}: Route.MetaArgs) {
 }
 
 // 日時をフォーマットする共通関数
-function formatDateTime(str?: string) {
-  const date = str ? new Date(str) : new Date();
+function formatDateTime(date: Date) {
   return date.toLocaleString("ja-JP", {
     timeZone: "Asia/Tokyo",
     year: "numeric",
@@ -45,9 +44,9 @@ export async function loader({ request }: Route.LoaderArgs) {}
 
 export default function Index({ loaderData }: Route.ComponentProps) {
   // 現在時刻を管理
-  const [now, setNow] = useState(formatDateTime());
+  const [now, setNow] = useState(() => new Date());
   const updateNow = useCallback(() => {
-    setNow(formatDateTime());
+    setNow(new Date());
   }, []);
   // 5分ごとにnowを更新
   useInterval(updateNow, 5 * 60 * 1000);
@@ -72,13 +71,33 @@ export default function Index({ loaderData }: Route.ComponentProps) {
   // logsを管理
   const [logs, setLogs] = useState<Key[] | null>(null);
   useEffect(() => {
-    if (!now || !minute || !targets) return;
+    if (!minute || !targets) {
+      setLogs(null);
+      return;
+    }
+
+    const abortController = new AbortController();
     const targetKeys = targets.map((target: Target) => target.key);
     const minuteValue = parseMinuteString(minute);
-    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`)
+    setLogs(null);
+    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`, {
+      signal: abortController.signal,
+    })
       .then((res) => res.json())
-      .then((res) => setLogs(res.data));
+      .then((res) => {
+        if (!abortController.signal.aborted) {
+          setLogs(Array.isArray(res.data) ? res.data : []);
+        }
+      });
+
+    return () => abortController.abort();
   }, [now, minute, targets]);
+
+  const minuteValue = minute ? parseMinuteString(minute) : 0;
+  const range = {
+    start: now.getTime() - minuteValue * 60 * 1000,
+    end: now.getTime(),
+  };
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -86,7 +105,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         <section className="flex justify-between items-center gap-2">
           <div className="text-xs sm:text-sm">
             <span className="block sm:inline mr-2">更新日</span>
-            <span>{now}</span>
+            <span>{formatDateTime(now)}</span>
           </div>
           <Select value={minute} onValueChange={setMinute}>
             <SelectTrigger className="w-24 cursor-pointer bg-white">
@@ -137,12 +156,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         logs={logs}
         targets={targets}
         defaultRdsList={["web_interpark", "web_saaske", "web_works"]}
+        range={range}
       />
       <ChartsCard
         title="Works"
         logs={logs}
         targets={targets}
         defaultRdsList={["works07", "works09"]}
+        range={range}
       />
       <ChartsCard
         title="サスケ"
@@ -156,6 +177,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           "saaske09",
           "saaske_api",
         ]}
+        range={range}
       />
       <SummaryCard
         className="col-span-1 md:col-span-2 xl:col-span-4"
