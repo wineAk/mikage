@@ -1,7 +1,7 @@
 import type { ChartRange } from "@/types/indexCard";
 import type { Key, Target } from "@/types/api";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 import { Button } from "~/components/ui/button";
 import { CardHeader, CardTitle, Card } from "~/components/ui/card";
@@ -42,7 +42,7 @@ export default function ChartsCard({
 }: ChartsCardProps) {
   const [rdsList, setRdsList] = useState<string[]>(defaultRdsList);
   const colorLists = getColorListsFromKey(defaultRdsList[0]);
-  const chartData = logs ? createChartData(rdsList, logs) : null;
+  const chartData = useMemo(() => logs ? createChartData(rdsList, logs) : null, [logs, rdsList]);
 
   useEffect(() => {
     if (title === "サスケ") {
