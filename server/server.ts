@@ -4,6 +4,7 @@ import { createRequestHandler } from "@react-router/express";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
+import { existsSync } from "node:fs";
 import sanitizeHtml from "sanitize-html";
 import { createClient } from "./app/lib/supabase/index.js";
 
@@ -12,14 +13,13 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const PORT = 80;
+const PORT = Number(process.env.PORT ?? 80);
 
 // セキュリティ対策: X-Powered-Byヘッダーを無効化（情報漏洩防止）
 app.disable('x-powered-by');
 
 // ALLOWED_IPS（カンマ区切り）を配列に
 const allowedIps = (process.env.ALLOWED_IPS || "").split(",").map(ip => ip.trim()).filter(Boolean);
-console.log('allowedIps:', allowedIps);
 
 // IP制御ミドルウェア（staticルートより前に）
 app.use((req, res, next) => {
@@ -28,10 +28,6 @@ app.use((req, res, next) => {
   const ipToCheck = reqIp || "";
   const ipList = ipToCheck.split(",").map(ip => ip.trim());
   const isAllowed = allowedIps.length === 0 || ipList.some(ip => allowedIps.includes(ip));
-  console.log('req.path:', req.path);
-  console.log('reqHeadForwardedFor:', reqHeadForwardedFor);
-  console.log('reqIp:', reqIp);
-  console.log('isAllowed:', isAllowed);
   // /api/v1/watch だけはIP制限スキップ
   if (/\/api\/v1\/watch/.test(req.path)) {
     return next();
@@ -65,11 +61,35 @@ app.use((req, res, next) => {
   res.setHeader("X-XSS-Protection", "1; mode=block");
   // X-Content-Type-Options ヘッダー（MIMEタイプスニッフィング防止）
   res.setHeader("X-Content-Type-Options", "nosniff");
+  if (req.path.startsWith("/api/") || req.path.endsWith(".data") || ["/", "/errors", "/incidents", "/login"].includes(req.path) || req.path.startsWith("/login/")) {
+    res.setHeader("Cache-Control", "private, no-store");
+  }
   next();
 });
 
 // staticルートを一番最初に
 //app.use("/assets", express.static(path.join(__dirname, "client/assets")));
+const assetDirectory = path.join(__dirname, "client/assets");
+app.use("/assets", (req, res, next) => {
+  res.vary("Accept-Encoding");
+  const encoding = req.acceptsEncodings("br", "gzip", "identity");
+  if (!/\.(js|css|svg|json)$/.test(req.path)) return next();
+  if (!encoding) { res.status(406).end(); return; }
+  if (encoding !== "br" && encoding !== "gzip") return next();
+  const suffix = encoding === "br" ? ".br" : ".gz";
+  if (!existsSync(path.join(assetDirectory, req.path + suffix))) {
+    if (!req.acceptsEncodings("identity")) { res.status(406).end(); return; }
+    return next();
+  }
+  res.type(path.extname(req.path));
+  res.setHeader("Content-Encoding", encoding);
+  req.url = req.url.replace(/^(.*?)(\?.*)?$/, `$1${suffix}$2`);
+  next();
+});
+app.use("/assets", express.static(assetDirectory, {
+  immutable: true,
+  maxAge: "1y",
+}));
 app.use(express.static(path.join(__dirname, "client")));
 
 /**
@@ -115,12 +135,11 @@ function injectLockOverlay(html: string, baseHref: string) {
 // /:key にアクセスされたときのプロキシ処理
 app.get("/:key", async (req, res, next) => {
   const key = req.params.key;
-  console.log('key:', key);
   if (typeof key !== "string") return res.redirect("/");
+  // 画面とReact Routerのデータ要求は外部サイトのキーとして照会しない。
+  if (["incidents", "errors", "login"].includes(key) || key.endsWith(".data")) return next();
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const fullUrl = new URL(key, baseUrl).toString();
-  console.log('baseUrl:', baseUrl);
-  console.log('fullUrl:', fullUrl);
   try {
     const fetchRequest = new Request(fullUrl, {
       method: req.method,
@@ -161,11 +180,18 @@ app.get("/:key", async (req, res, next) => {
 });
 
 // React Router v7 の SSR（最終的なcatch-all）
+// @ts-ignore ビルド時に生成されるルーターモジュールを読み込む。
+const serverBuild = await import("./server/index.js");
 app.use(
   createRequestHandler({
-    // @ts-ignore
-    build: await import("./server/index.js"),
+    build: serverBuild,
     mode: process.env.NODE_ENV || "production",
+    getLoadContext(_request, res) {
+      // 長時間接続の終了を、ルーター内で複製されるRequestのsignalだけに依存させない。
+      const connectionController = new AbortController();
+      res.once("close", () => connectionController.abort());
+      return { connectionSignal: connectionController.signal };
+    },
   })
 );
 

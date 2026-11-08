@@ -4,10 +4,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: 
-    "Zen Kaku Gothic New",
-    YakuHanJPs, Roboto, "Hiragino Kaku Gothic ProN", "ヒラギノ角ゴ ProN W3", Arial, nc3Jp,
-    "Inter", ui-sans-serif, system-ui, sans-serif,
+  --font-sans:
+    system-ui, "Yu Gothic UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "react-router build && tsc -p tsconfig.server.json",
+    "build": "react-router build && tsc -p tsconfig.server.json && node compress-assets.mjs",
     "start": "node build/server.js",
     "dev": "react-router dev",
     "start_dev": "react-router-serve ./build/server/index.js",
