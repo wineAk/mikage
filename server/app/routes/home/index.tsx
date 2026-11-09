@@ -1,6 +1,6 @@
 import type { Route } from "./+types/index";
-import type { Key, Target } from "@/types/api";
-import { useState, useEffect, useCallback } from "react";
+import { useMemo } from "react";
+import { data, useSearchParams } from "react-router";
 import {
   Select,
   SelectContent,
@@ -10,7 +10,13 @@ import {
 } from "~/components/ui/select";
 import ChartsCard from "./components/charts-card";
 import SummaryCard from "./components/summary-card";
-import { useInterval } from "~/library/index/useInterval";
+import { createPageHeaders, getPageCacheRevision, readTargets, readLogs } from "~/lib/pageQueries.server";
+import { readHomeMinute, minuteValue } from "~/lib/pageParams";
+import { readConsistentPage } from "~/lib/pageSnapshot.server";
+
+const webKeys = ["web_interpark", "web_saaske", "web_works"];
+const worksKeys = ["works07", "works09"];
+const saaskeKeys = ["saaske02", "saaske04", "saaske07", "saaske09", "saaske_api"];
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -31,76 +37,38 @@ function formatDateTime(date: Date) {
   });
 }
 
-// 分数文字列（例: "60*3"）を数値に変換
-function parseMinuteString(minute: string | null): number {
-  if (!minute) return 0;
-  return minute
-    .split("*")
-    .map(Number)
-    .reduce((a, b) => a * b, 1);
+export function headers({ loaderHeaders }: Route.HeadersArgs) { return loaderHeaders; }
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const minute = readHomeMinute(new URL(request.url).searchParams.get("minute"));
+  let checkedAt = new Date();
+  try {
+    const { targets, logs } = await readConsistentPage(request, async () => {
+      const targets = await readTargets(request);
+      checkedAt = new Date();
+      const logs = targets.length === 0 ? [] : await readLogs(request, targets.map(target => target.key), minuteValue(minute), checkedAt);
+      return { targets, logs };
+    });
+    return data({ targets, logs, minute, checkedAt: checkedAt.toISOString(), cacheRevision: getPageCacheRevision(request), loadError: null }, { headers: createPageHeaders(request) });
+  } catch {
+    return data({ targets: null, logs: null, minute, checkedAt: checkedAt.toISOString(), cacheRevision: null, loadError: "監視データを取得できませんでした。ページを再読み込みしてください。" }, { status: 503, headers: createPageHeaders(request) });
+  }
 }
 
-export async function loader({ request }: Route.LoaderArgs) {}
-
 export default function Index({ loaderData }: Route.ComponentProps) {
-  // 現在時刻を管理
-  const [now, setNow] = useState(() => new Date());
-  const updateNow = useCallback(() => {
-    setNow(new Date());
-  }, []);
-  // 5分ごとにnowを更新
-  useInterval(updateNow, 5 * 60 * 1000);
-
-  // 分間隔を管理
-  const [minute, setMinute] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (!minute) setMinute("60*1");
-  }, []);
-
-  // targetを管理
-  const [targets, setTargets] = useState<Target[] | null>(null);
-  useEffect(() => {
-    fetch("/api/v1/targets")
-      .then((res) => res.json())
-      .then((res) => {
-        const targets = res.data;
-        setTargets(targets);
-      });
-  }, []);
-
-  // logsを管理
-  const [logs, setLogs] = useState<Key[] | null>(null);
-  useEffect(() => {
-    if (!minute || !targets) {
-      setLogs(null);
-      return;
-    }
-
-    const abortController = new AbortController();
-    const targetKeys = targets.map((target: Target) => target.key);
-    const minuteValue = parseMinuteString(minute);
-    setLogs(null);
-    fetch(`/api/v1/keys/${targetKeys.join(",")}/minute/${minuteValue}`, {
-      signal: abortController.signal,
-    })
-      .then((res) => res.json())
-      .then((res) => {
-        if (!abortController.signal.aborted) {
-          setLogs(Array.isArray(res.data) ? res.data : []);
-        }
-      });
-
-    return () => abortController.abort();
-  }, [now, minute, targets]);
-
-  const minuteValue = minute ? parseMinuteString(minute) : 0;
-  const range = {
-    start: now.getTime() - minuteValue * 60 * 1000,
-    end: now.getTime(),
-  };
+  const { targets, logs, minute, checkedAt, loadError } = loaderData;
+  const [, setSearchParams] = useSearchParams();
+  const now = useMemo(() => new Date(checkedAt), [checkedAt]);
+  const range = useMemo(() => ({ start: now.getTime() - minuteValue(minute) * 60_000, end: now.getTime() }), [now, minute]);
+  const setMinute = (value: string) => setSearchParams(previous => {
+    const next = new URLSearchParams(previous);
+    next.set("minute", readHomeMinute(value));
+    return next;
+  });
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      {loadError && <p role="alert" className="col-span-full text-red-700">{loadError}</p>}
       <div className="col-span-1 md:col-span-2 xl:col-span-4">
         <section className="flex justify-between items-center gap-2">
           <div className="text-xs sm:text-sm">
@@ -110,7 +78,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
           <Select value={minute} onValueChange={setMinute}>
             <SelectTrigger className="w-24 cursor-pointer bg-white">
               <SelectValue
-                placeholder={minute === undefined ? "読み込み中……" : undefined}
+                placeholder="期間を選択"
               />
             </SelectTrigger>
             <SelectContent align="end">
@@ -155,14 +123,14 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         title="ホームページ"
         logs={logs}
         targets={targets}
-        defaultRdsList={["web_interpark", "web_saaske", "web_works"]}
+        defaultRdsList={webKeys}
         range={range}
       />
       <ChartsCard
         title="Works"
         logs={logs}
         targets={targets}
-        defaultRdsList={["works07", "works09"]}
+        defaultRdsList={worksKeys}
         range={range}
       />
       <ChartsCard
@@ -170,13 +138,7 @@ export default function Index({ loaderData }: Route.ComponentProps) {
         className="col-span-1 md:col-span-2"
         logs={logs}
         targets={targets}
-        defaultRdsList={[
-          "saaske02",
-          "saaske04",
-          "saaske07",
-          "saaske09",
-          "saaske_api",
-        ]}
+        defaultRdsList={saaskeKeys}
         range={range}
       />
       <SummaryCard

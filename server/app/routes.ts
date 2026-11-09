@@ -16,6 +16,7 @@ export default [
     route("errors/:offset", "routes/api/errors.tsx"),
     route("incidents/:offset", "routes/api/incidents.tsx"),
     route("targets", "routes/api/targets.tsx"),
+    route("updates", "routes/api/updates.tsx"),
     route("watch", "routes/api/watch.tsx"),
     route("keys/:keys/minute/:minute", "routes/api/keys.tsx"),
     route("*", "routes/api/404.tsx"),

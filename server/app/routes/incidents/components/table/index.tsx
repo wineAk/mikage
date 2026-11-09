@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import type { ErrorLog, Error, Incident, Target } from "@/types/api";
 
@@ -23,8 +23,12 @@ import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
 import { getColorListsFromKey } from "~/library/index/color";
 
 type IncidentsTableProps = {
-  className?: string;
-  targets: Target[] | null;
+  data: { incidents: Incident[]; errors: Error; targets: Target[]; checkedAt: string } | null;
+  onPrevious: () => void;
+  onNext: () => void;
+  canPrevious: boolean;
+  canNext: boolean;
+  isUpdating: boolean;
 };
 
 type IncidentError = Incident & {
@@ -87,6 +91,7 @@ function getTargetNames(
 // 日時をフォーマット
 function formatDateTime(date: Date): string {
   return date.toLocaleString("ja-JP", {
+    timeZone: "Asia/Tokyo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -95,68 +100,54 @@ function formatDateTime(date: Date): string {
   });
 }
 
-export default function IncidentsTable() {
-  const [offset, setOffset] = useState(0);
-  const handlePrev = () => setOffset((prev) => prev + 1);
-  const handleNext = () => setOffset((prev) => Math.max(0, prev - 1));
-
-  const [error, setError] = useState<Error | null>(null);
-  const [timeline, setTimeline] = useState<TimelineItem[] | null>(null);
-  useEffect(() => {
-    Promise.all([
-      fetch(`/api/v1/incidents/${offset}`).then((res) => res.json()),
-      fetch(`/api/v1/errors/${offset}`).then((res) => res.json()),
-      fetch("/api/v1/targets").then((res) => res.json()),
-    ]).then(([incidentsRes, errorsRes, targetsRes]) => {
-      const incidents = incidentsRes.data;
-      const errors = errorsRes.data;
-      const targets = targetsRes.data;
-      if (!incidents || !errors || !targets) return;
-      setError(errors);
-      // incidentsErrors生成
-      const filteredIncidents = incidents.reduce(
-        (acc: IncidentError[], incident: Incident) => {
-          const filtered = getFilteredErrors(incident, errors.logs);
-          const groupedErrors = getGroupedErrors(filtered);
-          if (hasArrayMore(groupedErrors)) {
-            acc.push({ ...incident, errors: filtered });
-          }
-          return acc;
-        },
-        []
-      );
-
-      // timeline生成
-      const timelineData = filteredIncidents.map(
-        (incidentErrors: IncidentError) => {
-          const { created_at, updated_at, is_closed, errors } = incidentErrors;
-          const createdDateObj = new Date(created_at);
-          const updatedDateObj = is_closed ? new Date(updated_at) : new Date();
-          const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
-          const diffMinutes = Math.ceil(diffMs / 1000 / 60);
-          const hours = Math.floor(diffMinutes / 60);
-          const minutes = diffMinutes % 60;
-          const groupedErrors = getGroupedErrors(errors);
-          const targetNames = getTargetNames(groupedErrors, targets);
-          return {
-            incident: incidentErrors,
-            groupedErrors,
-            created_date: formatDateTime(createdDateObj),
-            updated_date: formatDateTime(updatedDateObj),
-            hours,
-            minutes,
-            is_closed: !!is_closed,
-            is_today:
-              createdDateObj.toLocaleDateString("ja-JP") ===
-              new Date().toLocaleDateString("ja-JP"),
-            targetNames,
-          };
+export default function IncidentsTable({ data, onPrevious, onNext, canPrevious, canNext, isUpdating }: IncidentsTableProps) {
+  const error = data?.errors ?? null;
+  const timeline = useMemo<TimelineItem[] | null>(() => {
+    if (!data) return null;
+    const { incidents, errors, targets, checkedAt } = data;
+    // incidentsErrors生成
+    const filteredIncidents = incidents.reduce(
+      (acc: IncidentError[], incident: Incident) => {
+        const filtered = getFilteredErrors(incident, errors.logs);
+        const groupedErrors = getGroupedErrors(filtered);
+        if (hasArrayMore(groupedErrors)) {
+          acc.push({ ...incident, errors: filtered });
         }
-      );
-      // 新しい順に並び替えして保存
-      setTimeline(timelineData.reverse());
-    });
-  }, [offset]);
+        return acc;
+      },
+      []
+    );
+
+    // timeline生成
+    const timelineData = filteredIncidents.map(
+      (incidentErrors: IncidentError) => {
+        const { created_at, updated_at, is_closed, errors } = incidentErrors;
+        const createdDateObj = new Date(created_at);
+        const updatedDateObj = is_closed ? new Date(updated_at) : new Date(checkedAt);
+        const diffMs = updatedDateObj.getTime() - createdDateObj.getTime();
+        const diffMinutes = Math.ceil(diffMs / 1000 / 60);
+        const hours = Math.floor(diffMinutes / 60);
+        const minutes = diffMinutes % 60;
+        const groupedErrors = getGroupedErrors(errors);
+        const targetNames = getTargetNames(groupedErrors, targets);
+        return {
+          incident: incidentErrors,
+          groupedErrors,
+          created_date: formatDateTime(createdDateObj),
+          updated_date: formatDateTime(updatedDateObj),
+          hours,
+          minutes,
+          is_closed: !!is_closed,
+          is_today:
+            createdDateObj.toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }) ===
+            new Date(checkedAt).toLocaleDateString("ja-JP", { timeZone: "Asia/Tokyo" }),
+          targetNames,
+        };
+      }
+    );
+    // 新しい順に並び替えして保存
+    return timelineData.reverse();
+  }, [data]);
 
   return (
     <Card>
@@ -167,8 +158,8 @@ export default function IncidentsTable() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handlePrev}
-              disabled={!error || error.previous_month_count === 0}
+              onClick={onPrevious}
+              disabled={isUpdating || !canPrevious || !error || error.previous_month_count === 0}
               className="cursor-pointer"
             >
               前月
@@ -176,8 +167,8 @@ export default function IncidentsTable() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleNext}
-              disabled={!error || error.next_month_count === 0}
+              onClick={onNext}
+              disabled={isUpdating || !canNext || !error || error.next_month_count === 0}
               className="cursor-pointer"
             >
               次月

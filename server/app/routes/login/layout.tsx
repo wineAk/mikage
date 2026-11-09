@@ -1,22 +1,29 @@
-import type { Target } from "@/types/api";
+import type { Route } from "./+types/layout";
 
-import { useState, useEffect } from "react";
-import { NavLink, Outlet } from "react-router";
+import { useState } from "react";
+import { data, NavLink, Outlet } from "react-router";
 import { getColorListsFromKey } from "~/library/index/color";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import SpinnerCircleLarge from "~/components/SpinnerCircleLarge";
+import { createPageHeaders, getPageCacheRevision, readTargets } from "~/lib/pageQueries.server";
+import { readConsistentPage } from "~/lib/pageSnapshot.server";
 
-export default function LoginLayout() {
-  const [targets, setTargets] = useState<Target[] | null>(null);
-  useEffect(() => {
-    fetch("/api/v1/targets")
-      .then((res) => res.json())
-      .then((res) => {
-        const targets = res.data;
-        setTargets(targets);
-      });
-  }, []);
+export function headers({ loaderHeaders }: Route.HeadersArgs) { return loaderHeaders; }
+
+export function shouldRevalidate() { return true; }
+
+export async function loader({ request }: Route.LoaderArgs) {
+  try {
+    const targets = await readConsistentPage(request, () => readTargets(request));
+    return data({ targets, cacheRevision: getPageCacheRevision(request), loadError: null }, { headers: createPageHeaders(request) });
+  } catch {
+    return data({ targets: null, cacheRevision: null, loadError: "監視対象を取得できませんでした。ページを再読み込みしてください。" }, { status: 503, headers: createPageHeaders(request) });
+  }
+}
+
+export default function LoginLayout({ loaderData }: Route.ComponentProps) {
+  const { targets, loadError } = loaderData;
   const [isDarkMode, setIsDarkMode] = useState(true);
 
   return (
@@ -24,6 +31,7 @@ export default function LoginLayout() {
       <CardHeader>
         <CardTitle>ログイン</CardTitle>
       </CardHeader>
+      {loadError && <p role="alert" className="px-6 text-red-700">{loadError}</p>}
       {targets ? (
         <CardContent className="space-y-6">
           <nav className="grid grid-cols-6 gap-2">
