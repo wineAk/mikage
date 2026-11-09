@@ -1,0 +1,253 @@
+{
+  "measuredAt": "2026-11-07T13:24:49.924Z",
+  "cacheInstalled": false,
+  "environment": {
+    "browser": "156.0.8078.80",
+    "trials": 5,
+    "viewport": "1440x1000",
+    "throttling": false,
+    "db": "既存Supabaseへ読取のみ"
+  },
+  "pages": [
+    {
+      "route": "/",
+      "before": {
+        "median": 1103,
+        "max": 1500.2,
+        "samples": [
+          1005.5,
+          1041,
+          1103,
+          1187.3,
+          1500.2
+        ]
+      },
+      "current": {
+        "median": 602.3,
+        "max": 800.4,
+        "samples": [
+          556.7,
+          580.4,
+          602.3,
+          611.4,
+          800.4
+        ]
+      },
+      "directTransition": {
+        "median": 156.6,
+        "max": 159,
+        "samples": [
+          141.5,
+          155.8,
+          156.6,
+          158.9,
+          159
+        ]
+      }
+    },
+    {
+      "route": "/incidents",
+      "before": {
+        "median": 488.6,
+        "max": 898.2,
+        "samples": [
+          431.1,
+          441.4,
+          488.6,
+          523.9,
+          898.2
+        ]
+      },
+      "current": {
+        "median": 295.4,
+        "max": 340.4,
+        "samples": [
+          269.8,
+          275,
+          295.4,
+          324.3,
+          340.4
+        ]
+      },
+      "directTransition": {
+        "median": 176.5,
+        "max": 227.4,
+        "samples": [
+          158.9,
+          174.7,
+          176.5,
+          177,
+          227.4
+        ]
+      }
+    },
+    {
+      "route": "/errors",
+      "before": {
+        "median": 397.1,
+        "max": 613.6,
+        "samples": [
+          339.7,
+          383.5,
+          397.1,
+          404.9,
+          613.6
+        ]
+      },
+      "current": {
+        "median": 372.3,
+        "max": 405.2,
+        "samples": [
+          325.4,
+          352,
+          372.3,
+          381.1,
+          405.2
+        ]
+      },
+      "directTransition": {
+        "median": 175,
+        "max": 191.7,
+        "samples": [
+          173.2,
+          174,
+          175,
+          178.2,
+          191.7
+        ]
+      }
+    },
+    {
+      "route": "/login",
+      "before": {
+        "median": 406.3,
+        "max": 453.6,
+        "samples": [
+          367.5,
+          377.3,
+          406.3,
+          425.6,
+          453.6
+        ]
+      },
+      "current": {
+        "median": 339.1,
+        "max": 435,
+        "samples": [
+          274.1,
+          282.5,
+          339.1,
+          371.1,
+          435
+        ]
+      },
+      "directTransition": {
+        "median": 121.6,
+        "max": 138.8,
+        "samples": [
+          103.3,
+          103.7,
+          121.6,
+          124.1,
+          138.8
+        ]
+      }
+    }
+  ],
+  "api": [
+    {
+      "route": "/api/v1/targets",
+      "ms": 490.3,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/targets",
+      "ms": 118.2,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/targets",
+      "ms": 105.1,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/targets",
+      "ms": 109.6,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/targets",
+      "ms": 115.5,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/errors/0",
+      "ms": 3138,
+      "status": 200,
+      "hasError": true
+    },
+    {
+      "route": "/api/v1/errors/0",
+      "ms": 1092.5,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/errors/0",
+      "ms": 170,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/errors/0",
+      "ms": 154.5,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/errors/0",
+      "ms": 139.8,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/incidents/0",
+      "ms": 163.5,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/incidents/0",
+      "ms": 144.6,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/incidents/0",
+      "ms": 57.5,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/incidents/0",
+      "ms": 91.2,
+      "status": 200,
+      "hasError": false
+    },
+    {
+      "route": "/api/v1/incidents/0",
+      "ms": 58.1,
+      "status": 200,
+      "hasError": false
+    }
+  ],
+  "errors": {
+    "page": 0,
+    "api": 1
+  }
+}

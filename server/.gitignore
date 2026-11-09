@@ -3,3 +3,10 @@
 # React Router
 /.react-router/
 /build/
+/build-before/
+/build-freshness-before/
+/baseline-server*.log
+/performance-*.json
+/performance-database-*.sql
+
+performance-ui-*.png

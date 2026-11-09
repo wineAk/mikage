@@ -1,0 +1,1236 @@
+{
+  "measuredAt": {
+    "before": "2026-11-07T05:43:51.189Z",
+    "after": "2026-11-07T07:03:47.547Z"
+  },
+  "environment": {
+    "browser": "156.0.8078.80",
+    "viewport": "1440x1000",
+    "build": "ローカル本番ビルド",
+    "homeRangeMinutes": 60,
+    "trials": 5,
+    "cpuAndNetworkThrottling": false
+  },
+  "freshness": {
+    "ttlResultCache": false,
+    "everyNavigationReadsDatabase": true,
+    "refreshIntervalWhenVisibleMs": 60000,
+    "manualRefresh": true,
+    "onFocusOrVisible": true,
+    "onBackForwardCacheRestore": true,
+    "cacheControl": "private, no-store",
+    "inFlightDeduplication": "同一HTTP要求内のみ"
+  },
+  "notes": [
+    "比較前は画面データ15秒・対象一覧60秒のTTLを使用。比較後はTTLなし。再訪問の比較は鮮度条件が異なる。",
+    "各試行のホームは新しいブラウザーcontext。続く直接表示は共通assetsを再利用。",
+    "画面計測より先にAPIを各5回呼び出しているため、画面の読込値はDB完全コールド起動の値ではない。API初回値も別途保持。",
+    "intentはホバー後150msを待ってからクリックを計測。変更後はデータ先読みを使用しない。directはホバーなし。",
+    "表示完了はloadイベント、スピナー消失、navigation/revalidation完了、2フレーム確認。ブラウザー外の実画面提示完了を保証しない。",
+    "Server-Timingのsupabase_*は通信を含むSupabase要求時間で、DB内部の純粋な実行時間ではない。",
+    "実DB・OS負荷・GPU初期化・通信の変動を含む。最大値は今回の観測値で、本番配備後は未計測。",
+    "DBの関数定義・実行計画・索引一覧を読む管理権限がなく、DB内部の変更は未適用。"
+  ],
+  "pages": {
+    "/": {
+      "readyMs": {
+        "before": {
+          "count": 5,
+          "min": 1005.4633000000031,
+          "median": 1102.9570000000003,
+          "max": 1500.2014000000017,
+          "samples": [
+            1102.9570000000003,
+            1041.002699999999,
+            1187.2592000000004,
+            1005.4633000000031,
+            1500.2014000000017
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 430.94260000000213,
+          "median": 515.1460000000006,
+          "max": 781.1563999999998,
+          "samples": [
+            781.1563999999998,
+            656.3971000000001,
+            442.27770000000055,
+            430.94260000000213,
+            515.1460000000006
+          ]
+        }
+      },
+      "ttfb": {
+        "before": {
+          "count": 5,
+          "min": 29,
+          "median": 35.19999998807907,
+          "max": 114.89999997615814,
+          "samples": [
+            114.89999997615814,
+            29,
+            55.09999996423721,
+            35.19999998807907,
+            31.5
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 103,
+          "median": 148.60000002384186,
+          "max": 221,
+          "samples": [
+            221,
+            205.5,
+            110.59999996423721,
+            103,
+            148.60000002384186
+          ]
+        }
+      },
+      "fcp": {
+        "before": {
+          "count": 5,
+          "min": 428,
+          "median": 532,
+          "max": 1020,
+          "samples": [
+            1020,
+            532,
+            532,
+            464,
+            428
+          ]
+        },
+        "after": {
+          "count": 4,
+          "min": 304,
+          "median": 376,
+          "max": 480,
+          "samples": [
+            null,
+            480,
+            320,
+            304,
+            376
+          ]
+        }
+      },
+      "serverTimings": [
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 31.2
+          },
+          {
+            "name": "supabase_logs",
+            "duration": 47.7
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 28.7
+          },
+          {
+            "name": "supabase_logs",
+            "duration": 52.4
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 26.5
+          },
+          {
+            "name": "supabase_logs",
+            "duration": 34.4
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 25.4
+          },
+          {
+            "name": "supabase_logs",
+            "duration": 42.2
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 34.9
+          },
+          {
+            "name": "supabase_logs",
+            "duration": 43.3
+          }
+        ]
+      ]
+    },
+    "/incidents": {
+      "readyMs": {
+        "before": {
+          "count": 5,
+          "min": 431.0738999999994,
+          "median": 488.5737000000008,
+          "max": 898.1922999999988,
+          "samples": [
+            441.41159999999945,
+            488.5737000000008,
+            431.0738999999994,
+            523.9376999999986,
+            898.1922999999988
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 226.75340000000142,
+          "median": 260.53419999999824,
+          "max": 303.6894999999986,
+          "samples": [
+            278.59139999999934,
+            303.6894999999986,
+            226.75340000000142,
+            260.53419999999824,
+            244.31289999999717
+          ]
+        }
+      },
+      "ttfb": {
+        "before": {
+          "count": 5,
+          "min": 26.5,
+          "median": 118,
+          "max": 506.19999998807907,
+          "samples": [
+            26.5,
+            139.10000002384186,
+            118,
+            64.10000002384186,
+            506.19999998807907
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 108.60000002384186,
+          "median": 117.5,
+          "max": 140,
+          "samples": [
+            140,
+            117.5,
+            108.60000002384186,
+            117.60000002384186,
+            110.5
+          ]
+        }
+      },
+      "fcp": {
+        "before": {
+          "count": 5,
+          "min": 164,
+          "median": 244,
+          "max": 652,
+          "samples": [
+            164,
+            296,
+            244,
+            224,
+            652
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 180,
+          "median": 196,
+          "max": 236,
+          "samples": [
+            236,
+            220,
+            180,
+            196,
+            196
+          ]
+        }
+      },
+      "serverTimings": [
+        [
+          {
+            "name": "supabase_incidents",
+            "duration": 24.3
+          },
+          {
+            "name": "supabase_targets",
+            "duration": 55.5
+          },
+          {
+            "name": "supabase_errors",
+            "duration": 120
+          }
+        ],
+        [
+          {
+            "name": "supabase_incidents",
+            "duration": 21.2
+          },
+          {
+            "name": "supabase_targets",
+            "duration": 32.6
+          },
+          {
+            "name": "supabase_errors",
+            "duration": 98.4
+          }
+        ],
+        [
+          {
+            "name": "supabase_incidents",
+            "duration": 26.4
+          },
+          {
+            "name": "supabase_targets",
+            "duration": 27.4
+          },
+          {
+            "name": "supabase_errors",
+            "duration": 92.3
+          }
+        ],
+        [
+          {
+            "name": "supabase_incidents",
+            "duration": 38.8
+          },
+          {
+            "name": "supabase_targets",
+            "duration": 40.6
+          },
+          {
+            "name": "supabase_errors",
+            "duration": 103.6
+          }
+        ],
+        [
+          {
+            "name": "supabase_incidents",
+            "duration": 24.8
+          },
+          {
+            "name": "supabase_targets",
+            "duration": 32.2
+          },
+          {
+            "name": "supabase_errors",
+            "duration": 90.2
+          }
+        ]
+      ]
+    },
+    "/errors": {
+      "readyMs": {
+        "before": {
+          "count": 5,
+          "min": 339.6780999999992,
+          "median": 397.10210000000006,
+          "max": 613.6399999999994,
+          "samples": [
+            404.90400000000045,
+            339.6780999999992,
+            397.10210000000006,
+            613.6399999999994,
+            383.5064999999995
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 258.5670000000009,
+          "median": 296.79030000000057,
+          "max": 381.2667000000001,
+          "samples": [
+            310.40939999999955,
+            381.2667000000001,
+            258.5670000000009,
+            296.79030000000057,
+            292.3171999999977
+          ]
+        }
+      },
+      "ttfb": {
+        "before": {
+          "count": 5,
+          "min": 15.199999988079071,
+          "median": 22.100000023841858,
+          "max": 24.19999998807907,
+          "samples": [
+            15.199999988079071,
+            22.100000023841858,
+            24.19999998807907,
+            22.5,
+            18.30000001192093
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 124.80000001192093,
+          "median": 140.5999999642372,
+          "max": 182.89999997615814,
+          "samples": [
+            146.60000002384186,
+            182.89999997615814,
+            129.5,
+            140.5999999642372,
+            124.80000001192093
+          ]
+        }
+      },
+      "fcp": {
+        "before": {
+          "count": 5,
+          "min": 68,
+          "median": 88,
+          "max": 96,
+          "samples": [
+            68,
+            96,
+            92,
+            88,
+            88
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 212,
+          "median": 252,
+          "max": 296,
+          "samples": [
+            252,
+            296,
+            216,
+            252,
+            212
+          ]
+        }
+      },
+      "serverTimings": [
+        [
+          {
+            "name": "supabase_errors",
+            "duration": 91.1
+          }
+        ],
+        [
+          {
+            "name": "supabase_errors",
+            "duration": 98.6
+          }
+        ],
+        [
+          {
+            "name": "supabase_errors",
+            "duration": 92.7
+          }
+        ],
+        [
+          {
+            "name": "supabase_errors",
+            "duration": 97.8
+          }
+        ],
+        [
+          {
+            "name": "supabase_errors",
+            "duration": 83.6
+          }
+        ]
+      ]
+    },
+    "/login": {
+      "readyMs": {
+        "before": {
+          "count": 5,
+          "min": 367.48909999999887,
+          "median": 406.34490000000005,
+          "max": 453.6301999999996,
+          "samples": [
+            377.3127000000004,
+            425.6220000000012,
+            406.34490000000005,
+            453.6301999999996,
+            367.48909999999887
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 252.5524000000005,
+          "median": 286.6404999999995,
+          "max": 360.84179999999924,
+          "samples": [
+            360.84179999999924,
+            286.6404999999995,
+            255.16159999999945,
+            296.6980999999978,
+            252.5524000000005
+          ]
+        }
+      },
+      "ttfb": {
+        "before": {
+          "count": 5,
+          "min": 12.5,
+          "median": 18.80000001192093,
+          "max": 30.19999998807907,
+          "samples": [
+            12.5,
+            20.399999976158142,
+            30.19999998807907,
+            18.80000001192093,
+            18.100000023841858
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 41.59999996423721,
+          "median": 57.5,
+          "max": 99.30000001192093,
+          "samples": [
+            99.30000001192093,
+            57.5,
+            41.59999996423721,
+            72.30000001192093,
+            42.60000002384186
+          ]
+        }
+      },
+      "fcp": {
+        "before": {
+          "count": 5,
+          "min": 96,
+          "median": 108,
+          "max": 124,
+          "samples": [
+            96,
+            108,
+            124,
+            104,
+            108
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 212,
+          "median": 256,
+          "max": 336,
+          "samples": [
+            336,
+            256,
+            212,
+            272,
+            228
+          ]
+        }
+      },
+      "serverTimings": [
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 65.1
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 22.7
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 19.2
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 46.9
+          }
+        ],
+        [
+          {
+            "name": "supabase_targets",
+            "duration": 21.7
+          }
+        ]
+      ]
+    }
+  },
+  "navigation": {
+    "/": {
+      "intent": {
+        "before": {
+          "count": 10,
+          "min": 58.200000047683716,
+          "median": 102.80000001192093,
+          "max": 162.69999998807907,
+          "samples": [
+            108.30000001192093,
+            73.69999998807907,
+            115.39999997615814,
+            69.69999998807907,
+            162.69999998807907,
+            68.09999996423721,
+            102.80000001192093,
+            58.200000047683716,
+            105.90000003576279,
+            67.39999997615814
+          ]
+        },
+        "after": {
+          "count": 10,
+          "min": 113.5,
+          "median": 124.30000001192093,
+          "max": 187.5,
+          "samples": [
+            150.30000001192093,
+            123.39999997615814,
+            137.4000000357628,
+            122.10000002384186,
+            129.60000002384186,
+            113.5,
+            124,
+            123,
+            124.30000001192093,
+            187.5
+          ]
+        }
+      },
+      "direct": {
+        "before": {
+          "count": 5,
+          "min": 49.39999997615814,
+          "median": 60.89999997615814,
+          "max": 67.5,
+          "samples": [
+            67.5,
+            60.89999997615814,
+            51.10000002384186,
+            49.39999997615814,
+            64.5
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 104.80000001192093,
+          "median": 138.5999999642372,
+          "max": 191,
+          "samples": [
+            138.5999999642372,
+            120.19999998807907,
+            104.80000001192093,
+            139.19999998807907,
+            191
+          ]
+        }
+      }
+    },
+    "/incidents": {
+      "intent": {
+        "before": {
+          "count": 5,
+          "min": 47.5,
+          "median": 56,
+          "max": 62.69999998807907,
+          "samples": [
+            56,
+            49.89999997615814,
+            62.69999998807907,
+            57.90000003576279,
+            47.5
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 140.9000000357628,
+          "median": 152.89999997615814,
+          "max": 198.39999997615814,
+          "samples": [
+            147.69999998807907,
+            164.5,
+            152.89999997615814,
+            140.9000000357628,
+            198.39999997615814
+          ]
+        }
+      },
+      "direct": {
+        "before": {
+          "count": 5,
+          "min": 49,
+          "median": 50,
+          "max": 63,
+          "samples": [
+            49,
+            63,
+            49.799999952316284,
+            50.40000003576279,
+            50
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 140.5,
+          "median": 155.5,
+          "max": 263.5999999642372,
+          "samples": [
+            155.5,
+            157.5999999642372,
+            140.5,
+            141,
+            263.5999999642372
+          ]
+        }
+      }
+    },
+    "/errors": {
+      "intent": {
+        "before": {
+          "count": 5,
+          "min": 55.10000002384186,
+          "median": 76,
+          "max": 84.5,
+          "samples": [
+            77.19999998807907,
+            84.5,
+            67.40000003576279,
+            76,
+            55.10000002384186
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 140,
+          "median": 164.5,
+          "max": 179.70000004768372,
+          "samples": [
+            164.5,
+            154.29999995231628,
+            179.70000004768372,
+            140,
+            178.89999997615814
+          ]
+        }
+      },
+      "direct": {
+        "before": {
+          "count": 5,
+          "min": 48.200000047683716,
+          "median": 52.30000001192093,
+          "max": 62.19999998807907,
+          "samples": [
+            60.200000047683716,
+            62.19999998807907,
+            48.200000047683716,
+            51.700000047683716,
+            52.30000001192093
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 135.69999998807907,
+          "median": 139.5,
+          "max": 175.10000002384186,
+          "samples": [
+            140.10000002384186,
+            137.89999997615814,
+            135.69999998807907,
+            139.5,
+            175.10000002384186
+          ]
+        }
+      }
+    },
+    "/login": {
+      "intent": {
+        "before": {
+          "count": 5,
+          "min": 43.39999997615814,
+          "median": 50.5,
+          "max": 62.799999952316284,
+          "samples": [
+            48.59999996423721,
+            57.39999997615814,
+            62.799999952316284,
+            50.5,
+            43.39999997615814
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 73.30000001192093,
+          "median": 83.90000003576279,
+          "max": 101.39999997615814,
+          "samples": [
+            79.59999996423721,
+            73.30000001192093,
+            83.90000003576279,
+            89,
+            101.39999997615814
+          ]
+        }
+      },
+      "direct": {
+        "before": {
+          "count": 5,
+          "min": 48.200000047683716,
+          "median": 58.40000003576279,
+          "max": 61.30000001192093,
+          "samples": [
+            61.30000001192093,
+            59.5,
+            48.200000047683716,
+            49.89999997615814,
+            58.40000003576279
+          ]
+        },
+        "after": {
+          "count": 5,
+          "min": 85.30000001192093,
+          "median": 86.19999998807907,
+          "max": 105.39999997615814,
+          "samples": [
+            86,
+            86.80000001192093,
+            86.19999998807907,
+            85.30000001192093,
+            105.39999997615814
+          ]
+        }
+      }
+    }
+  },
+  "api": {
+    "/api/v1/targets": {
+      "before": {
+        "count": 5,
+        "min": 69.58550000000014,
+        "median": 86.78600000000006,
+        "max": 313.2312999999999,
+        "samples": [
+          313.2312999999999,
+          89.71399999999994,
+          69.58550000000014,
+          75.51710000000003,
+          86.78600000000006
+        ]
+      },
+      "after": {
+        "count": 5,
+        "min": 56.140300000000025,
+        "median": 59.20400000000018,
+        "max": 358.64789999999994,
+        "samples": [
+          358.64789999999994,
+          59.20400000000018,
+          69.23430000000008,
+          56.140300000000025,
+          57.622299999999996
+        ]
+      }
+    },
+    "/api/v1/errors/0": {
+      "before": {
+        "count": 5,
+        "min": 101.50919999999951,
+        "median": 146.8669,
+        "max": 3147.2993999999994,
+        "samples": [
+          3147.2993999999994,
+          464.3018000000002,
+          119.34310000000005,
+          146.8669,
+          101.50919999999951
+        ]
+      },
+      "after": {
+        "count": 5,
+        "min": 111.82040000000052,
+        "median": 130.42469999999958,
+        "max": 1269.5973,
+        "samples": [
+          1269.5973,
+          118.70420000000013,
+          130.42469999999958,
+          111.82040000000052,
+          131.14030000000002
+        ]
+      }
+    },
+    "/api/v1/incidents/0": {
+      "before": {
+        "count": 5,
+        "min": 30.36620000000039,
+        "median": 44.664600000000064,
+        "max": 50.52260000000024,
+        "samples": [
+          49.71090000000004,
+          30.36620000000039,
+          50.52260000000024,
+          44.664600000000064,
+          39.73310000000038
+        ]
+      },
+      "after": {
+        "count": 5,
+        "min": 40.83100000000013,
+        "median": 53.98860000000059,
+        "max": 60.16530000000057,
+        "samples": [
+          55.48269999999957,
+          44.161700000000565,
+          60.16530000000057,
+          53.98860000000059,
+          40.83100000000013
+        ]
+      }
+    }
+  },
+  "databaseDiagnostic": {
+    "measuredAt": "2026-11-07T05:36:00.815Z",
+    "results": [
+      {
+        "label": "targets-explain",
+        "status": 406,
+        "headerMs": 378.0691,
+        "totalMs": 386.1012,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "errorCode": "PGRST107",
+        "bytes": 157,
+        "planAvailable": false
+      },
+      {
+        "label": "catalog-exposure",
+        "status": 404,
+        "headerMs": 45.00690000000003,
+        "totalMs": 45.786699999999996,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "errorCode": "PGRST205",
+        "bytes": 167,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-targets",
+        "status": 200,
+        "headerMs": 28.24989999999997,
+        "totalMs": 28.657199999999932,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-logs",
+        "status": 200,
+        "headerMs": 55.05650000000003,
+        "totalMs": 55.382600000000025,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-incidents",
+        "status": 200,
+        "headerMs": 36.85450000000003,
+        "totalMs": 37.167100000000005,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "current-errors-rpc",
+        "status": 500,
+        "headerMs": 3051.2894,
+        "totalMs": 3052.8245,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "errorCode": "57014",
+        "bytes": 100,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-targets",
+        "status": 200,
+        "headerMs": 40.85809999999992,
+        "totalMs": 41.265300000000025,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-logs",
+        "status": 200,
+        "headerMs": 36.771400000000085,
+        "totalMs": 37.2166000000002,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-incidents",
+        "status": 200,
+        "headerMs": 43.7484000000004,
+        "totalMs": 44.103000000000065,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "current-errors-rpc",
+        "status": 200,
+        "headerMs": 509.77669999999944,
+        "totalMs": 511.2446,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 8924,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-targets",
+        "status": 200,
+        "headerMs": 33.29160000000047,
+        "totalMs": 33.4342000000006,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-logs",
+        "status": 200,
+        "headerMs": 44.17099999999937,
+        "totalMs": 44.347099999999955,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-incidents",
+        "status": 200,
+        "headerMs": 24.668400000000474,
+        "totalMs": 24.84979999999996,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "current-errors-rpc",
+        "status": 200,
+        "headerMs": 111.30559999999969,
+        "totalMs": 115.08460000000014,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 8924,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-targets",
+        "status": 200,
+        "headerMs": 30.473500000000058,
+        "totalMs": 30.819400000000314,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-logs",
+        "status": 200,
+        "headerMs": 27.71680000000015,
+        "totalMs": 27.96770000000015,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-incidents",
+        "status": 200,
+        "headerMs": 38.872299999999996,
+        "totalMs": 39.045099999999366,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "current-errors-rpc",
+        "status": 200,
+        "headerMs": 122.59740000000056,
+        "totalMs": 124.2498999999998,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 8924,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-targets",
+        "status": 200,
+        "headerMs": 28.573999999999614,
+        "totalMs": 28.811799999999494,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-logs",
+        "status": 200,
+        "headerMs": 26.91870000000017,
+        "totalMs": 27.1871000000001,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "zero-row-incidents",
+        "status": 200,
+        "headerMs": 20.409599999999955,
+        "totalMs": 20.90610000000015,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 2,
+        "rowCount": 0,
+        "planAvailable": false
+      },
+      {
+        "label": "current-errors-rpc",
+        "status": 200,
+        "headerMs": 94.87019999999939,
+        "totalMs": 95.60039999999935,
+        "contentType": "application/json; charset=utf-8",
+        "serverTiming": null,
+        "bytes": 8924,
+        "planAvailable": false
+      }
+    ]
+  },
+  "rejectedQueryCandidate": {
+    "measuredAt": "2026-11-07T05:44:11.908Z",
+    "results": [
+      {
+        "offset": 0,
+        "oldMs": 284.2488000000001,
+        "directMs": 770.7464000000002,
+        "count": 37,
+        "previousMonthCount": 195,
+        "nextMonthCount": 0,
+        "exactMultisetMatch": true
+      },
+      {
+        "offset": 1,
+        "oldMs": 115.85580000000027,
+        "directMs": 144.41010000000006,
+        "count": 195,
+        "previousMonthCount": 0,
+        "nextMonthCount": 37,
+        "exactMultisetMatch": true
+      },
+      {
+        "offset": 2,
+        "oldMs": 96.54419999999982,
+        "directMs": 129.92399999999998,
+        "count": 0,
+        "previousMonthCount": 0,
+        "nextMonthCount": 195,
+        "exactMultisetMatch": true
+      },
+      {
+        "offset": 3,
+        "oldMs": 48.92459999999983,
+        "directMs": 75.85159999999996,
+        "count": 0,
+        "previousMonthCount": 0,
+        "nextMonthCount": 0,
+        "exactMultisetMatch": true
+      },
+      {
+        "iteration": 0,
+        "offset": 0,
+        "oldMs": 105.67849999999999,
+        "directMs": 109.78580000000011,
+        "exactMultisetMatch": true
+      },
+      {
+        "iteration": 1,
+        "offset": 0,
+        "oldMs": 120.26249999999982,
+        "directMs": 121.41989999999987,
+        "exactMultisetMatch": true
+      },
+      {
+        "iteration": 2,
+        "offset": 0,
+        "oldMs": 138.61180000000013,
+        "directMs": 117.17360000000008,
+        "exactMultisetMatch": true
+      },
+      {
+        "iteration": 3,
+        "offset": 0,
+        "oldMs": 121.51279999999997,
+        "directMs": 114.79829999999993,
+        "exactMultisetMatch": true
+      },
+      {
+        "iteration": 4,
+        "offset": 0,
+        "oldMs": 104.79269999999997,
+        "directMs": 119.22609999999986,
+        "exactMultisetMatch": true
+      }
+    ]
+  },
+  "verification": {
+    "productionUnitTests": 12,
+    "assetDeliveryTests": 7,
+    "browserRegressionTests": 19,
+    "experimentalTests": 4,
+    "build": "passed",
+    "typecheck": "passed",
+    "independentReview": "重大指摘なし"
+  },
+  "failures": {
+    "before": {
+      "api": 1,
+      "page": 0
+    },
+    "after": {
+      "api": 0,
+      "page": 0
+    }
+  }
+}
