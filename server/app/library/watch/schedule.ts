@@ -1,6 +1,6 @@
 export type WatchSchedule =
   | { mode: "all"; reason: "business_hours" | "reduced_business_hours" }
-  | { mode: "round_robin"; reason: "low_traffic" | "holiday" | "holiday_data_unavailable" }
+  | { mode: "round_robin"; reason: "low_traffic" | "holiday" | "holiday_data_unavailable" | "closure_period" | "closure_config_invalid" }
   | { mode: "skip"; reason: "reduced_business_hours_interval" };
 
 type HolidayResponse = {
@@ -12,12 +12,70 @@ type HolidayCache = {
   fetchedAt: number;
 };
 
+type ClosurePeriod = {
+  startDate: string;
+  endDate: string;
+};
+
+type ClosureConfig = {
+  rawValue: string | undefined;
+  periods: ClosurePeriod[] | null;
+};
+
 const JAPAN_TIME_ZONE = "Asia/Tokyo";
 const HOLIDAY_CACHE_DURATION_MS = 24 * 60 * 60 * 1000;
 const HOLIDAY_FETCH_RETRY_DELAY_MS = 60 * 60 * 1000;
 const HOLIDAY_REQUEST_TIMEOUT_MS = 5_000;
 const holidayCache = new Map<number, HolidayCache>();
 const holidayRetryAfter = new Map<number, number>();
+let cachedClosureConfig: ClosureConfig | undefined;
+
+function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function getClosurePeriods(): ClosurePeriod[] | null {
+  const rawValue = process.env.WATCH_REDUCED_POLLING_PERIODS;
+  if (cachedClosureConfig && cachedClosureConfig.rawValue === rawValue) {
+    return cachedClosureConfig.periods;
+  }
+
+  if (rawValue === undefined) {
+    cachedClosureConfig = { rawValue, periods: [] };
+    return cachedClosureConfig.periods;
+  }
+
+  const periods: ClosurePeriod[] = [];
+  for (const entry of rawValue.split(",")) {
+    const dates = entry.trim().split("/").map((value) => value.trim());
+    const [startDate, endDate] = dates;
+    if (
+      dates.length !== 2 ||
+      !isCalendarDate(startDate) ||
+      !isCalendarDate(endDate) ||
+      startDate > endDate
+    ) {
+      console.error("休暇期間の設定が不正です。低負荷巡回を継続します。");
+      cachedClosureConfig = { rawValue, periods: null };
+      return null;
+    }
+    periods.push({ startDate, endDate });
+  }
+
+  cachedClosureConfig = { rawValue, periods };
+  return periods;
+}
+
+function isClosureDate(dateKey: string, periods: ClosurePeriod[], hasCustomPeriods: boolean): boolean {
+  if (hasCustomPeriods) {
+    return periods.some(({ startDate, endDate }) => startDate <= dateKey && dateKey <= endDate);
+  }
+
+  const monthDay = dateKey.slice(5);
+  return monthDay >= "12-29" || monthDay <= "01-03";
+}
 
 function getJstParts(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -85,6 +143,14 @@ export async function getWatchSchedule(date: Date = new Date()): Promise<WatchSc
 
   if (!isWeekday) {
     return { mode: "round_robin", reason: "low_traffic" };
+  }
+
+  const closurePeriods = getClosurePeriods();
+  if (!closurePeriods) {
+    return { mode: "round_robin", reason: "closure_config_invalid" };
+  }
+  if (isClosureDate(dateKey, closurePeriods, process.env.WATCH_REDUCED_POLLING_PERIODS !== undefined)) {
+    return { mode: "round_robin", reason: "closure_period" };
   }
 
   const holidayDates = await getHolidayDates(year, date.getTime());
