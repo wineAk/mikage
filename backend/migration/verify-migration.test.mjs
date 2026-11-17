@@ -87,7 +87,8 @@ test("schema contract comparison accepts legacy targets while checking transferr
 test("schema contract accepts destination-only notification recovery state on incidents", () => {
   const columns = JSON.stringify([
     ["id", "bigint", "NO", null, "", ""],
-    ["keyword", "text", "NO", "'unknown'::text", "YES", "ALWAYS"],
+    ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],
+    ["count", "bigint", "NO", "'1'::bigint", "", ""],
   ]);
   const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: columns }]);
   const target = structuredClone(source);
@@ -96,6 +97,22 @@ test("schema contract accepts destination-only notification recovery state on in
     ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
   ]);
   assert.equal(compareSchemaContracts(source, target), true);
+});
+
+test("schema contract rejects incident defaults that differ from Supabase", () => {
+  const sourceColumns = JSON.stringify([
+    ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],
+    ["count", "bigint", "NO", "'1'::bigint", "", ""],
+  ]);
+  const targetColumns = JSON.stringify([
+    ["keyword", "text", "NO", "'unknown'::text", "", ""],
+    ["count", "bigint", "NO", "1", "", ""],
+    ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
+  ]);
+  const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: sourceColumns }]);
+  const target = createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]);
+
+  assert.equal(compareSchemaContracts(source, target), false);
 });
 
 test("schema contract permits destination-only migration objects missing from Supabase", () => {
