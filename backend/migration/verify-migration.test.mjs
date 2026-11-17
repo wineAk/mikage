@@ -99,6 +99,28 @@ test("schema contract accepts destination-only notification recovery state on in
   assert.equal(compareSchemaContracts(source, target), true);
 });
 
+test("schema contract ignores incident column order while checking every column definition", () => {
+  const sourceColumns = JSON.stringify([
+    ["id", "bigint", "NO", null, "", ""],
+    ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],
+    ["googlechat_name", "text", "YES", null, "", ""],
+    ["instatus_id", "text", "YES", null, "", ""],
+  ]);
+  const targetColumns = JSON.stringify([
+    ["id", "bigint", "NO", null, "", ""],
+    ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],
+    ["instatus_id", "text", "YES", null, "", ""],
+    ["googlechat_name", "text", "YES", null, "", ""],
+    ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
+  ]);
+  const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: sourceColumns }]);
+  const target = createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]);
+
+  assert.equal(compareSchemaContracts(source, target), true);
+  target.find((row) => row.kind === "columns" && row.name === "incidents").definition = targetColumns.replace("YES", "NO");
+  assert.equal(compareSchemaContracts(source, target), false);
+});
+
 test("schema contract rejects incident defaults that differ from Supabase", () => {
   const sourceColumns = JSON.stringify([
     ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],

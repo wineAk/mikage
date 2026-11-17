@@ -168,11 +168,17 @@ export const schemaContractQuery = `
 
 export function compareSchemaContracts(sourceRows, targetRows) {
   const normalizeRows = (rows) => rows.map((row) => {
-    if (row.kind !== "columns" || !["targets", "incidents"].includes(row.name)) return row;
+    if (row.kind !== "columns") return row;
     try {
-      const destinationOnlyColumns = row.name === "targets" ? ["is_enabled"] : ["notification_pending"];
-      return { ...row, definition: JSON.stringify(JSON.parse(row.definition)
-        .filter((column) => !destinationOnlyColumns.includes(column[0]))) };
+      const destinationOnlyColumns = row.name === "targets"
+        ? ["is_enabled"]
+        : row.name === "incidents"
+          ? ["notification_pending"]
+          : [];
+      const columns = JSON.parse(row.definition)
+        .filter((column) => !destinationOnlyColumns.includes(column[0]))
+        .sort(([leftName], [rightName]) => leftName.localeCompare(rightName));
+      return { ...row, definition: JSON.stringify(columns) };
     } catch {
       return row;
     }
