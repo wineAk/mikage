@@ -1,3 +1,5 @@
+import { parseSuccessfulNotificationResponse } from "./notificationResponse.mjs";
+
 const instatusURI = "https://api.instatus.com";
 const INSTATUS_API_KEY = process.env.VITE_INSTATUS_API_KEY;
 //const page_id = process.env.VITE_INSTATUS_PAGE_ID;
@@ -9,6 +11,11 @@ const headers = {
   "Content-Type": "application/json",
 };
 
+type InstatusResponse = {
+  incident?: { id?: string };
+  id?: string;
+};
+
 // Instatus APIリクエスト送信
 async function sendInstatusRequest(url: string, body: any) {
   const res = await fetch(url, {
@@ -16,7 +23,7 @@ async function sendInstatusRequest(url: string, body: any) {
     headers,
     body: JSON.stringify(body),
   });
-  return await res.json();
+  return await parseSuccessfulNotificationResponse<InstatusResponse>(res, "Instatus");
 }
 
 // コンポーネントのステータス作成

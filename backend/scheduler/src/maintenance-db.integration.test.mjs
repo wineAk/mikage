@@ -1,0 +1,98 @@
+import assert from "node:assert/strict";
+import pg from "pg";
+import test, { after } from "node:test";
+import { runMaintenanceJob } from "./maintenance-scheduler.mjs";
+
+const databaseConfigured = Boolean(process.env.TEST_PGHOST);
+const pool = databaseConfigured
+  ? new pg.Pool({
+      host: process.env.TEST_PGHOST,
+      port: Number(process.env.TEST_PGPORT ?? "5432"),
+      user: "mikage_maintenance",
+      password: process.env.TEST_MAINTENANCE_PGPASSWORD,
+      database: process.env.TEST_PGDATABASE,
+    })
+  : null;
+const fixturePool = databaseConfigured
+  ? new pg.Pool({
+      host: process.env.TEST_PGHOST,
+      port: Number(process.env.TEST_PGPORT ?? "5432"),
+      user: process.env.TEST_PGUSER,
+      password: process.env.TEST_PGPASSWORD,
+      database: process.env.TEST_PGDATABASE,
+    })
+  : null;
+
+after(async () => {
+  await Promise.all([pool?.end(), fixturePool?.end()]);
+});
+
+test("maintenance DB role prunes only past retention and can reindex only owned tables", { skip: !databaseConfigured }, async () => {
+  const ownership = await pool.query("SELECT current_user, pg_has_role(current_user, 'mikage_data_owner', 'member') AS owns_maintenance_tables");
+  assert.equal(ownership.rows[0].current_user, "mikage_maintenance");
+  assert.equal(ownership.rows[0].owns_maintenance_tables, true);
+
+  await pool.query("REINDEX TABLE CONCURRENTLY mikage.logs");
+  await pool.query("REINDEX TABLE CONCURRENTLY mikage.incidents");
+  await assert.rejects(pool.query("REINDEX TABLE CONCURRENTLY mikage.targets"), (error) => error.code === "42501");
+
+  const now = new Date();
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(now).map(({ type, value }) => [type, value]));
+  const previousMonthStartUtc = Date.UTC(Number(parts.year), Number(parts.month) - 2, 1) - 9 * 60 * 60 * 1000;
+  const retentionStart = new Date(previousMonthStartUtc + 10 * 24 * 60 * 60 * 1000);
+  const oldRecord = new Date(previousMonthStartUtc - 24 * 60 * 60 * 1000);
+  const marker = `maintenance-${crypto.randomUUID()}`;
+  let createdLogCount = 0;
+  let incidentCount = 0;
+  const retainedSlot = new Date(retentionStart.getTime() + 60_000);
+  const oldSlot = new Date(oldRecord.getTime() + 60_000);
+  const oldBatchRequestId = `${marker}:old`;
+  const retainedBatchRequestId = `${marker}:retained`;
+  try {
+    await fixturePool.query(
+      "INSERT INTO mikage.targets (key, name, url) VALUES ($1,$1,'https://example.invalid')",
+      [marker]
+    );
+    const createdLogs = await pool.query(
+      "INSERT INTO mikage.logs (target_key, created_at, status_code, error_code) VALUES ($1,$2,200,$3),($1,$4,200,$5) RETURNING id, created_at",
+      [marker, oldRecord, `${marker}-old`, retentionStart, `${marker}-retained`]
+    );
+    createdLogCount = createdLogs.rowCount;
+    const incident = await pool.query(
+      "INSERT INTO mikage.incidents (keyword, created_at, updated_at) VALUES ($1,$2,$2),($3,$4,$4) RETURNING keyword, created_at",
+      [`${marker}-old`, oldRecord, `${marker}-retained`, retentionStart]
+    );
+    incidentCount = incident.rowCount;
+    await pool.query(
+      "INSERT INTO mikage.watch_result_batches (slot_start, request_hash, saved_at) VALUES ($1, repeat('a', 64), $2), ($3, repeat('b', 64), $4)",
+      [oldSlot, oldRecord, retainedSlot, retentionStart]
+    );
+    await pool.query(
+      "INSERT INTO mikage.incident_transition_batches (request_id, request_hash, transition, saved_at) VALUES ($1, repeat('c', 64), 'open', $2), ($3, repeat('d', 64), 'update', $4)",
+      [oldBatchRequestId, oldRecord, retainedBatchRequestId, retentionStart]
+    );
+    await fixturePool.query("UPDATE mikage.migration_state SET data_verified=true, verified_at=clock_timestamp() WHERE singleton=true");
+    await runMaintenanceJob("prune", pool);
+    const retainedLogs = await pool.query("SELECT count(*)::int AS count FROM mikage.logs WHERE error_code LIKE $1", [`${marker}-%`]);
+    const retainedIncidents = await pool.query("SELECT count(*)::int AS count FROM mikage.incidents WHERE keyword LIKE $1", [`${marker}-%`]);
+    const retainedWatchBatches = await pool.query("SELECT count(*)::int AS count FROM mikage.watch_result_batches WHERE slot_start IN ($1, $2)", [oldSlot, retainedSlot]);
+    const retainedIncidentBatches = await pool.query("SELECT count(*)::int AS count FROM mikage.incident_transition_batches WHERE request_id IN ($1, $2)", [oldBatchRequestId, retainedBatchRequestId]);
+    assert.equal(retainedLogs.rows[0].count, 1);
+    assert.equal(retainedIncidents.rows[0].count, 1);
+    assert.equal(retainedWatchBatches.rows[0].count, 1);
+    assert.equal(retainedIncidentBatches.rows[0].count, 1);
+  } finally {
+    await pool.query("DELETE FROM mikage.logs WHERE error_code LIKE $1", [`${marker}-%`]);
+    await pool.query("DELETE FROM mikage.incidents WHERE keyword LIKE $1", [`${marker}-%`]);
+    await pool.query("DELETE FROM mikage.watch_result_batches WHERE slot_start IN ($1, $2)", [oldSlot, retainedSlot]);
+    await pool.query("DELETE FROM mikage.incident_transition_batches WHERE request_id IN ($1, $2)", [oldBatchRequestId, retainedBatchRequestId]);
+    await fixturePool.query("DELETE FROM mikage.targets WHERE key=$1", [marker]);
+    await fixturePool.query("UPDATE mikage.migration_state SET data_verified=false, verified_at=NULL WHERE singleton=true");
+  }
+  assert.equal(createdLogCount, 2);
+  assert.equal(incidentCount, 2);
+});

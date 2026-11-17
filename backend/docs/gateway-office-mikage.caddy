@@ -1,0 +1,175 @@
+# Import inside the existing gw-aws.bab.dad site block, after the
+# CloudFront origin-verification handler and /health handler.
+# This fragment deliberately excludes /admin and /v1/admin/*.
+# MIKAGE_API_HOST must match the LAN-only Dokploy Domain host for the API service.
+
+@office_mikage_watch_targets {
+	method GET
+	path /office/mikage/watch-targets
+}
+handle @office_mikage_watch_targets {
+	rewrite * /v1/monitoring/targets
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_watch_reservations {
+	method POST
+	path /office/mikage/watch-reservations
+}
+handle @office_mikage_watch_reservations {
+	rewrite * /v1/watch/reservations
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_watch_results {
+	method POST
+	path /office/mikage/watch-results
+}
+handle @office_mikage_watch_results {
+	request_body {
+		max_size 1MB
+	}
+	rewrite * /v1/watch/results
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_watch_state {
+	method GET
+	path /office/mikage/watch-state
+}
+handle @office_mikage_watch_state {
+	rewrite * /v1/watch/state
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_watch_incidents {
+	method POST
+	path /office/mikage/watch-incidents
+}
+handle @office_mikage_watch_incidents {
+	request_body {
+		max_size 1MB
+	}
+	rewrite * /v1/watch/incidents
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_targets {
+	method GET
+	path /office/mikage/view-targets
+}
+handle @office_mikage_view_targets {
+	rewrite * /v1/view/targets
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_target_proxy {
+	method GET
+	path /office/mikage/view-target-proxy
+}
+handle @office_mikage_view_target_proxy {
+	rewrite * /v1/view/target-proxy
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_logs {
+	method GET
+	path /office/mikage/view-logs
+}
+handle @office_mikage_view_logs {
+	rewrite * /v1/view/logs
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_errors {
+	method GET
+	path /office/mikage/view-errors
+}
+handle @office_mikage_view_errors {
+	rewrite * /v1/view/errors
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_incidents {
+	method GET
+	path /office/mikage/view-incidents
+}
+handle @office_mikage_view_incidents {
+	rewrite * /v1/view/incidents
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}
+
+@office_mikage_view_revision {
+	method GET
+	path /office/mikage/view-revision
+}
+handle @office_mikage_view_revision {
+	rewrite * /v1/view/revision
+	reverse_proxy {$MIKAGE_API_UPSTREAM} {
+		header_up Host {$MIKAGE_API_HOST}
+		transport http {
+				tls_server_name {$MIKAGE_API_HOST}
+		}
+		header_up -X-Origin-Verify
+	}
+}

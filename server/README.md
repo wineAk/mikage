@@ -80,7 +80,7 @@ Make sure to deploy the output of `npm run build`
 
 ## 監視スケジュール
 
-`/api/v1/watch` はGASから毎分呼び出される。監視対象と実行時間帯はミカゲ側で管理する。時刻判定はJSTを使用し、日本の祝日は年単位の祝日APIを24時間キャッシュして判定する。祝日一覧を取得できず有効なキャッシュもない場合は、毎分1対象の巡回に切り替える。
+`/api/v1/watch` は現行環境ではGASから毎分呼び出される。移行branchではquery `key` を廃止し、`MIKAGE_WATCH_EXECUTE_TOKEN` の `Authorization: Bearer ...` headerで認証する。監視対象と実行時間帯はミカゲ側で管理する。時刻判定はJSTを使用し、日本の祝日は年単位の祝日APIを24時間キャッシュして判定する。祝日一覧を取得できず有効なキャッシュもない場合は、毎分1対象の巡回に切り替える。
 
 | 条件 | 実行内容 |
 | --- | --- |
@@ -100,15 +100,17 @@ WATCH_REDUCED_POLLING_PERIODS=2026-12-28/2027-01-04,2027-08-10/2027-08-13
 
 日付は `YYYY-MM-DD` 形式の実在日付とし、開始日を終了日以前にする。設定が不正な場合は全件監視を避けるため、平日も毎分1対象の巡回へ切り替えて警告を記録する。設定変更後はアプリを再起動し、監視 API 応答の `execution.reason` が対象期間に `closure_period`、期間外は通常の理由になっていることを確認する。期間中は各対象の確認間隔が長くなり、障害検知と復旧確認も遅くなる。
 
-### Supabase設定
+### Database migration status
 
-`server/sql/monitoring-schedule.sql` をSupabase SQL Editorで一度適用する。Renderには `SUPABASE_SECRET_KEY` をサーバー専用環境変数として登録する。値を `VITE_` 接頭辞付きの環境変数、ブラウザー、ログ、API応答へ出さない。このSecret KeyはRLSを迂回し、プロジェクト全体のDB権限を持つ。サーバー側のスケジューラ専用クライアントからのみ使う。
+移行用feature branchでは、通常のView・監視・target proxy処理をMikage API経由へ置き換えている。新しいSupabase secret keyをRenderへ登録したり、Supabaseへmigration SQLを適用したりしない。SupabaseからDokploy PostgreSQLへのデータ移行手順は [`backend/README.md`](../backend/README.md) に記載している。実データ移行と本番切替は未実施。
 
-既存の `VITE_SUPABASE_ANON_KEY` は通常のアプリ処理に使い続ける。`SUPABASE_SECRET_KEY` が未設定、SQL未適用、または予約・状態保存に失敗した場合、対象サイトの確認やインシデント復旧判定は行わず、監視APIはエラーを返す。
+### Dokploy API Gateway（移行ブランチ）
+
+View/monitoring APIは `MIKAGE_GATEWAY_BASE_URL` と `MIKAGE_API_BEARER_TOKEN` を使い、Render serverからVPS Gateway経由でDokploy上のMikage APIを呼ぶ。watch起動は別の `MIKAGE_WATCH_EXECUTE_TOKEN` で保護し、schedulerからRenderへ渡す。両tokenはserver-only環境変数とし、`VITE_`を付けない。Caddy route fragmentは `watch-targets`, `watch-reservations`, `watch-results`, `watch-state`, `watch-incidents` と `view-targets`, `view-target-proxy`, `view-logs`, `view-errors`, `view-incidents`, `view-revision` を各API endpointへrewriteする。Caddy fragmentはリポジトリに準備済みだが、VPSには未配置。Render側の置換はfeature branchのみで、環境変数や本番設定は変更していない。GASの既存query-key triggerはfeature branchと互換がないため、本番切替のscheduler起動元変更と同時に停止する。
 
 ### ロールバック
 
-監視処理に問題があった場合は、Renderで直前のアプリケーションリリースへ戻す。GASの毎分トリガーは変更していないため、旧アプリでは従来どおり全対象を確認する。ロールバック後に旧アプリの稼働を確認してから、今回追加した `SUPABASE_SECRET_KEY` をRenderから削除する。SQLで作成したテーブルとRPCは自動削除しない。不要と確認できた後に別途削除する。
+本番切替は未実施。切替後に不具合が起きた場合、アプリreleaseだけを戻しても新DBへ保存した監視結果はSupabaseへ戻らない。専用schedulerを停止して二重実行を防ぎ、新旧DBの書込み差分と切戻し先を確認する。実施順と停止条件は [Dokploy運用手順](../backend/docs/deployment-runbook.md) を参照する。具体的な切替・切戻し手順が承認されるまではGAS、Render環境変数、Supabase cronを変更しない。
 
 ## Styling
 

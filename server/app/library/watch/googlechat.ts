@@ -1,7 +1,12 @@
 import type { LogResult } from "@/types/watch";
+import { parseSuccessfulNotificationResponse } from "./notificationResponse.mjs";
 
 const googleChatWebhookUrl = process.env.VITE_GOOGLE_WEBHOOK_URL || "";
 const headers = { "Content-Type": "application/json" };
+
+type GoogleChatResponse = {
+  thread?: { name?: string };
+};
 
 // エラー内容をcardsV2化
 // CARD: https://addons.gsuite.google.com/uikit/builder?hl=ja
@@ -81,7 +86,7 @@ export async function sendGoogleChatRequest(url: string, body: any) {
     headers,
     body: JSON.stringify(body),
   });
-  return await res.json();
+  return await parseSuccessfulNotificationResponse<GoogleChatResponse>(res, "Google Chat");
 }
 
 // スレッド新規作成

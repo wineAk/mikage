@@ -1,5 +1,5 @@
 import type { Route } from "./+types/keys";
-import { createClient } from "~/lib/supabase";
+import { fetchMikageApi } from "~/lib/mikageApi.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // パラメータを取得
@@ -13,12 +13,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const start = new Date(now.getTime() - minute * 60 * 1000).toISOString();
 
   // データ取得
-  const { supabase } = createClient(request, "mikage");
-  const { data, error } = await supabase.rpc("get_logs_in_range", {
-    keys: keys,
-    start_time: start,
-    end_time: end,
-  });
+  const query = new URLSearchParams({ keys: keys.join(","), start, end });
+  const { data } = await fetchMikageApi<{ data: unknown; error: null }>("view-logs", { query, signal: request.signal });
+  const error = null;
   
   return new Response(JSON.stringify({ data, error }), {
     headers: { "Content-Type": "application/json" },
