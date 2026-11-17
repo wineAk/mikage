@@ -1,6 +1,6 @@
-# Mikage 専用 PostgreSQL / 監視 API（実装中）
+# Mikage 専用 PostgreSQL / 監視 API
 
-Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy 専用Compose appはfeature branchから手動deploy済みで、初回はPostgreSQLとschema migrationだけを起動する設定。Render server routeはGateway API clientへ切替済み、scheduler codeもCompose内に実装済み。N094のdeploy後container状態・API runtime routeは今回未再確認。実Gateway接続、Supabaseデータ移行、Render/GAS/scheduler切替は未完了。
+Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQLとschema migrationをdeployし、Supabase staging snapshotのimportと独立verifierも完了している。APIとmaintenance schedulerはComposeの通常serviceとして起動する。watch schedulerは専用 `watch` profileで隔離し、GAS/Render切替が終わるまで起動しない。本番データ移行、実Gateway接続、Render/GAS/scheduler切替は未完了。
 
 ## 含まれるもの
 
@@ -16,7 +16,7 @@ Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy 専
 
 ## Dokploy運用・切替手順
 
-staging deploy、Supabaseデータ移行、本番切替、切戻しの順序と停止条件は [deployment-runbook.md](./docs/deployment-runbook.md) を参照する。手順書は用意済みだが、実環境の未確認条件が残るためdeploy/切替は未実施。
+本番切替、実Gateway検証、Render/GAS停止、切戻しの順序と停止条件は [deployment-runbook.md](./docs/deployment-runbook.md) を参照する。DokployへのDB/API deploymentとstaging snapshotの移行は完了しているが、本番データ移行とアプリの接続先切替は未実施。
 
 ## ローカル起動
 
@@ -26,13 +26,13 @@ cp .env.example .env
 # POSTGRES_PASSWORD、DB password 2種、API/watch tokenを個別にランダム生成して設定
 # 管理画面をローカルで開く場合は、targets.lan.example を127.0.0.1へ名前解決させる
 # （hostsファイルへ 127.0.0.1 targets.lan.example を追加し、http://targets.lan.example:3101 を開く）
-# ローカルはWATCH_SCHEDULER_ENABLED=false。Dokploy appでは確認後にservice環境変数へtrueとRender URL/tokenを明示設定
+# ローカルはwatch profileを有効化しない。DokployではGAS停止を確認後、watch profileとservice環境変数を明示して起動
 
 docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 # Local development only: release the runtime gate for this local database.
 docker compose -f docker-compose.yml exec -T postgres \
   sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "UPDATE mikage.migration_state SET data_verified=true, verified_at=clock_timestamp() WHERE singleton=true"'
-docker compose --profile runtime -f docker-compose.yml -f docker-compose.local.yml up --build -d
+docker compose -f docker-compose.yml -f docker-compose.local.yml up --build -d
 ```
 
 Postgres は Compose network 内のみ。API は `127.0.0.1:3101` にbind（local override）。admin Host allowlistはloopback名・IP自体を拒否するため、ローカル画面もallowlist済みの `targets.lan.example` で開く。watch schedulerは `WATCH_SCHEDULER_ENABLED` に `true` または `false` を明示しないと起動しない。
@@ -50,12 +50,12 @@ docker compose -f docker-compose.yml exec -T postgres \
 ### migration の再適用
 
 `migrate` サービスは起動のたびに `schema_migrations` を参照し、未適用分だけ実行する。
-`api`、`watch-scheduler`、`maintenance-scheduler` は `runtime` profileに属し、Dokployの初回deployでは `COMPOSE_PROFILES` を空欄にする。Supabaseのdata importと独立verifierが成功した後に `COMPOSE_PROFILES=runtime` を設定して手動再deployする。`/health` を除くAPI routeは `mikage.migration_state.data_verified` がtrueになるまで503で閉じ、healthcheckはDB接続だけを確認する。両schedulerはAPI healthcheck成功後に起動する。maintenance scheduler自身も各削除・REINDEX jobの直前に同じDBゲートを確認する。runtime内ではAPIとmaintenance workerがschema migration完了を依存条件にし、watch schedulerもruntime開始時点では無効にしておく。schedulerだけを単独で先行起動する運用はしない。
+`api` と `maintenance-scheduler` は通常serviceとして起動する。`/health` を除くAPI routeは `mikage.migration_state.data_verified` がtrueになるまで503で閉じ、healthcheckはDB接続だけを確認する。maintenance schedulerはAPI healthcheckとschema migrationの完了後に起動し、各削除・REINDEX jobの直前にも同じDBゲートを確認する。watch schedulerだけを `watch` profileに置き、GAS/Render切替の承認が済むまで起動しない。Dokploy環境の `COMPOSE_PROFILES` は移行と初期確認中は空欄にする。watch切替の承認後にだけ、対象service内で `watch` profileを有効にし、`WATCH_SCHEDULER_ENABLED=true` とRender URL/tokenを設定する。他のserviceやDokploy全体設定には触れない。
 PostgreSQL管理ユーザーとmigration serviceが `mikage_api` と `mikage_maintenance` roleを管理する。API runtimeは `mikage_api`、maintenance workerは `logs` / `incidents` と2つの冪等性batch表だけを所有するroleで接続する。logs/incidentsはevent時刻、冪等性記録は `saved_at` を基準に、いずれもJST前月初境界で削除する。watch schedulerはRender用tokenだけを持ち、DB/API networkに参加しない。ローカルは無効、Dokployは対象Compose serviceの環境変数で有効を明示し、Render URL/token未設定時は起動に失敗する。接続設定はURL連結を避け、個別の `PG*` 環境変数で渡す。
 
 ### Supabase データ移行（手動ワンショット）
 
-通常のDokploy起動ではDBとschema migrationだけを開始し、APIと両schedulerはComposeの `runtime` profileに置く。Supabase importとverifierが成功するまでDokploy環境の `COMPOSE_PROFILES` は空欄にし、検証後にだけ `runtime` を設定して手動再deployする。`migration-verify` は全検査成功後に限り `mikage.migration_state.data_verified` をtrueにする。APIはこの状態を確認して `/health` 以外の全routeを開き、`/health` はDB接続だけを確認する。両schedulerはAPI healthcheck成功後に起動する。maintenance schedulerはjob直前にもDBゲートを確認する。watch schedulerはその後も確認完了まで `WATCH_SCHEDULER_ENABLED=false` にする。
+通常のDokploy起動ではDB、schema migration、API、maintenance schedulerが起動する。`migration-verify` は全検査成功後に限り `mikage.migration_state.data_verified` をtrueにする。APIはこの状態を確認して `/health` 以外の全routeを開き、`/health` はDB接続だけを確認する。maintenance schedulerはAPI healthcheck成功後に起動し、job直前にもDBゲートを確認する。watch schedulerは `watch` profileに隔離し、GAS切替の確認が完了するまでprofileを有効にしない。watch切替承認後は対象serviceの `COMPOSE_PROFILES=watch` と `WATCH_SCHEDULER_ENABLED=true`、Render URL/tokenを設定する。
 
 `migration-import` は Compose の `migration` profile にのみ属し、通常のDokploy起動では実行されない。source接続情報は `.env` または対象Dokploy serviceの一時secretとして設定し、`verify-full`でTLS証明書とhost名を検証する。Supabase DashboardのDatabase settingsからroot certificateを取得し、Base64化した内容を `MIKAGE_SOURCE_PGSSLROOTCERT_BASE64` に設定する。IPv4環境ではDashboardのConnectからSession pooler（port 5432）を選ぶ。transaction pooler（6543）は使わない。対象4表のうちmonitoring state tablesはRLS有効のため、移行専用roleには一時的に `BYPASSRLS` 属性が必要になる。これはRLSを無視する強い属性なので、対象4表と2 sequenceだけへの明示GRANT、role membershipなし、read-only transaction、短時間利用、照合後のDROP ROLEを組み合わせる。importerとverifierは接続roleの `rolsuper` / `rolbypassrls` を確認し、RLSを迂回できないroleを拒否する。移行前に現在のschema/table/sequence名、所有者、RLS設定、grant、role attributeと実データ可視性を再確認する。
 

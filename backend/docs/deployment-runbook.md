@@ -25,8 +25,8 @@
   | `watch-scheduler` | `mikage_egress` | detach |
 
   Preview Composeと`docker network inspect`で、共有networkにはMikageの`api`以外が参加せず既存memberが変化していないことを確認する。Postgres・scheduler・test/migration serviceに公開Domain/host portがない。
-- [ ] staging/production移行中はDokploy Compose環境の `COMPOSE_PROFILES` を空欄にする。このとき`postgres`と一回限りの`migrate`だけが起動し、`api`とscheduler、migration/test profileのserviceは起動しない。importとverifier成功後にだけ `runtime` を設定して手動再deployする。
-- [ ] `runtime`を有効化してAPIを起動する構成では、`migration-verify`成功前も`/health`はDB接続を返し、それ以外の全routeが503で閉じることを確認する。health 200はmigration gate通過を意味しない。watch/maintenance schedulerはAPI healthcheck成功後に起動する。maintenance jobも実行直前にDB gateを再確認する。
+- [ ] Dokploy Compose環境の `COMPOSE_PROFILES` は空欄にする。通常起動では`postgres`、`migrate`、`api`、`maintenance-scheduler`が起動し、`watch-scheduler`とmigration/test profile serviceは起動しない。`watch` profileはRender/GAS切替の承認後だけ有効にする。
+- [ ] `migration-verify`成功前も`/health`はDB接続を返し、それ以外の全routeが503で閉じることを確認する。health 200はmigration gate通過を意味しない。maintenance schedulerはAPI healthcheck成功後に起動し、各job直前にDB gateを再確認する。
 - [ ] APIの `MIKAGE_ADMIN_ALLOWED_HOSTS` はLAN専用Domainのみ、`MIKAGE_TARGET_ALLOWED_HOSTS` は現在のenabled target hostを完全一致で含む。
 - [ ] API Domain設定後、LAN内と既存VPS Caddy/Tailscale経路から必要なAPI pathへ到達でき、LAN外と公開Gateway経路から管理画面/APIへ到達できないことを実測する。ユーザーが確認した既存network pathや他serviceは変更しない。
 - [ ] CloudFrontがAuthorizationをoriginへforwardし、queryを保持し、cacheを無効化している。standard/realtime logにAuthorizationが出ないことを確認する。GreenCloud/RackNerd両originでも確認する。
@@ -39,7 +39,7 @@
 ## staging構築と移行リハーサル
 
 1. 本番volumeと分離した空のstaging DB/appを用意し、GitHub feature branchをDokployから手動deployする。branch/commit、service状態、health、Domainを記録する。
-2. 初回deployでは `COMPOSE_PROFILES` を空欄にしてDBとschema migrationだけを起動する。`postgres`と一回限りの`migrate`が完了し、`api` と両schedulerが起動していないこと、Postgres host portがなく、管理DomainからAPIへ接続できないことを確認する。
+2. 初回deployでは `COMPOSE_PROFILES` を空欄にして手動deployする。`postgres`と一回限りの`migrate`、`api`、`maintenance-scheduler`の状態を確認し、watch schedulerが起動していないこと、Postgres host portがなく、管理DomainからのアクセスがLAN内に限定されることを確認する。`/health`以外のAPI routeがmigration gateにより503で閉じることも確認する。
 3. 監視起動、外部通知、Render staging接続を無効のままにし、通知をmockまたは安全なstaging通知先へ向ける。production Instatus/Google Chatへ送らない。
 4. Supabase sourceのhost/port/database、TLS CA、read-only用一時credentialを用意する。sourceの現行schema、RLS、対象4表の行数・期間・sequenceを取得し、既存writerを特定する。
 5. stagingでは本番Render writer、GAS、Supabase cronを停止しない。まず`docker compose --profile migration run --rm migration-preflight`を実行してschema-only照合を済ませる。Supabase sourceへの専用TLS接続を用意し、別terminalで`docker compose --profile snapshot run --rm -it migration-snapshot`を対話起動する。sourceセッションで次を入力し、出力されたsnapshot IDを記録する。
@@ -51,7 +51,7 @@
 
    psqlのトランザクションを開いたまま維持する。snapshot exporterを閉じるとsnapshot IDは失効するため、短時間にdumpとverifierを終える。長時間保持はVACUUMによるdead row回収を遅らせる。snapshot IDをmigration service環境の`MIKAGE_SOURCE_SNAPSHOT_ID`へ設定し、`MIKAGE_SOURCE_WRITES_FROZEN`は設定しない。snapshot IDは秘密値ではないが、完了後に環境から消す。Supabase Session Poolerは接続開始時の`PGOPTIONS`を反映しないため、importerは独立したsource接続で`BEGIN READ ONLY`を実行してread-only状態を確認する。PostgreSQL 17の`pg_dump --snapshot`もdump transactionを`REPEATABLE READ, READ ONLY`に設定してからsnapshotを適用する。
 6. schema contractは列名で定義を対応付け、列の並び順は比較しない。共通列の型・nullable・default・identityなど列ごとの属性は厳密比較する。移行先専用の `targets.is_enabled` と `incidents.notification_pending` はmigration定義どおり存在し属性が一致することを別途検証し、Supabase側に `targets.is_enabled` がある場合はその属性も移行先と厳密比較する。`information_schema.columns.column_default` のcast・引用符の違いも不一致として止める。Supabaseの`incidents.keyword` / `count` defaultはmigration `015_incident_default_parity.sql`で揃える。015適用後のN094 preflightでは、`incidents.googlechat_name` と `instatus_id` の列順差だけが比較不一致として残った。比較器を列名単位に正規化する修正後、schema-only preflightを再実行し、成功するまでsnapshot/export/importへ進まない。空の移行先で`migration-import`を実行し、終了後に`migration-verify`を実行する。importerは完了済みpreflightとDBを依存先に持つ。verifierはimporterを依存先にしない（検証時に空DB専用importerをComposeが再起動しないようにするため）。このため実行順は手動で守り、両serviceに同じ`MIKAGE_SOURCE_SNAPSHOT_ID`を設定する。importerの`pg_dump --snapshot`とverifierのREPEATABLE READ transactionが同じexported snapshotを使うため、通常の監視書込みやcronが継続しても同一DB時点のtable rowsを比較できる。sequence値はMVCC snapshotに含まれず稼働中に進むため、staging verifierは移行先がsnapshot内の最大IDを再利用しないことを確認し、source/destinationのsequence完全一致は要求しない。本番切替はwriter停止モードで実行し、sequenceの完全一致を検証する。importer/verifierはsource接続roleがsuperuserまたは`BYPASSRLS`であることを確認する。verifierは対象4表のrow hash/count、identity sequence安全性、FK孤児、schema contractを照合し、全検査の成功後にだけmigration gateを開く。保持期間境界と重要集計は同じsnapshot時点のsourceとdestinationで別途照合する。不一致なら同じ移行先を再利用せず、空の専用DBからやり直す。検証後、snapshot psqlで`ROLLBACK;`してから`\q`で終了する。snapshot ID、一時source credential、CAをmigration環境から削除し、一時migration roleをSupabaseから撤去する。
-7. schema-only preflight後、stagingで`COMPOSE_PROFILES=runtime`を設定して手動再deployし、import/verifier前に`/health`だけがDB接続を返し、それ以外のAPI routeが503で閉じることを確認する。health 200はmigration gate通過を意味しない。import/verifierのmigration serviceはCompose dependencyに従ってAPI起動後も実行できることを確認し、verifier成功後に管理画面、retention/reindexを確認する。sourceとdestinationは別DBなのでSupabase cronを維持したままdestination maintenanceを検証できる。watch schedulerはRender staging endpointと安全な通知sinkを用意して明示確認するまで`WATCH_SCHEDULER_ENABLED=false`のままにする。
+7. schema-only preflight後、既定起動中のAPIで`/health`だけがDB接続を返し、それ以外のAPI routeが503で閉じることを確認する。import/verifier成功後に管理画面とretention/reindexを確認する。sourceとdestinationは別DBなのでSupabase cronを維持したままdestination maintenanceを検証できる。watch schedulerは`watch` profileに隔離し、Render staging endpointと安全な通知sinkを用意して明示確認するまで起動しない。
 8. Render stagingを手動deployし、社内IP/通常IPのDB選択、View GET、watch結果POST、重複予約、target管理、revision更新、API再起動、JST/祝日周期を検証する。
 9. 外部通知成功後・DB保存前にRender processを停止するfailure injectionを行う。再開後、同じslotの再試行が続く間は保存済みwatch結果を再利用し、pending状態から通知を再送して重複を許容しながら、後続のDB保存成功でstateが収束することを確認する。失敗slotからschedulerが次slotへ進んだケースは通常の5分通知間隔ルールに従うことも確認する。通知API自体を失敗させるケースも別に注入し、pendingが残って次tickで再試行され、通知成功を確認していない状態でincident transitionが確定しないことを確認する。
 10. 15分、1時間、24時間、7日の時点でAPI/DB/scheduler health、request失敗、遅延、行数増分、通知、View表示を確認する。stagingで未検証の項目と実測値を記録する。
@@ -102,11 +102,11 @@ ORDER BY 1;
 本番切替はこの手順だけでは開始しない。ownerの明示的な切替指示とstaging完了確認を前提とする。
 
 1. 切替時間、作業担当、rollback判断者、観察期間、監視通知先を確認する。
-2. Renderの旧DB書込み、GAS、Supabase cron、Dokploy runtime serviceを停止する。sourceの新規書込みが止まったことを確認し、Supabaseの対象表件数・期間・sequenceと、空のproduction移行先を記録する。
-3. `COMPOSE_PROFILES` が空欄でruntime serviceが停止していることを再確認する。`MIKAGE_SOURCE_WRITES_FROZEN=true`を設定し、`MIKAGE_SOURCE_SNAPSHOT_ID`は空にする。staging rehearsalと同じ`migration-preflight` → `migration-import` → `migration-verify`をproduction sourceから実行する。4表の件数・最古/最新日時・保持期間別件数、sequence、FK、schema差分の全照合記録が揃うまで書込みを開始しない。
+2. Renderの旧DB書込み、GAS、Supabase cron、Dokployのwatch profileを停止する。sourceの新規書込みが止まったことを確認し、Supabaseの対象表件数・期間・sequenceと、空のproduction移行先を記録する。Dokploy APIは `data_verified=false` の移行先ではhealth以外を503にする。
+3. `watch` profileが無効であることを再確認する。`MIKAGE_SOURCE_WRITES_FROZEN=true`を設定し、`MIKAGE_SOURCE_SNAPSHOT_ID`は空にする。staging rehearsalと同じ`migration-preflight` → `migration-import` → `migration-verify`をproduction sourceから実行する。4表の件数・最古/最新日時・保持期間別件数、sequence、FK、schema差分の全照合記録が揃うまで書込みを開始しない。APIは起動していてもmigration gateで書込みを含む全routeが503となる。
 4. 一時source credential/role/acknowledgementを撤去し、migrationログ・shell履歴にsecretがないことを確認する。stream dumpはファイル化しない。
-5. 全データ照合後、`COMPOSE_PROFILES=runtime` を設定してDokploy専用appを手動再deployする。API healthを確認する。RenderへGateway origin rootと専用API Bearerを設定し、feature branchから承認済みreleaseをdeployする。まずView GETとread-only画面を確認する。この段階ではRender writer、GAS、両maintenance schedulerは停止を維持する。
-6. 限定したwatch POSTで新DBへの保存とread-backを照合する。Supabase cronが停止し旧DBへのwriteがないことを確認した後、Dokploy maintenance schedulerを1 replicaで起動する。watch schedulerはGAS停止を再確認してから有効化し、Render endpointが毎分1回だけ起動することを確認する。新旧schedulerを同時に有効化しない。
+5. 全データ照合後、Dokploy専用appを手動再deployし、API healthと管理Domainを確認する。RenderへGateway origin rootと専用API Bearerを設定し、feature branchから承認済みreleaseをdeployする。まずView GETとread-only画面を確認する。この段階ではRender writer、GAS、Supabase cronを停止せず、watch profileも無効のままにする。maintenance schedulerはdestinationの照合gateとJST実行時刻に従う。
+6. 限定したwatch POSTで新DBへの保存とread-backを照合する。Supabase cronが停止し旧DBへのwriteがないことを確認した後、maintenance schedulerが1 replicaで稼働していることを確認する。watch schedulerはGAS停止を再確認してから`watch` profileで有効化し、Render endpointが毎分1回だけ起動することを確認する。新旧schedulerを同時に有効化しない。
 7. 即時、15分、1時間、24時間、7日で安定性を確認する。Supabaseは観察期間中保全し、完了確認前にcron/credential/databaseを撤去しない。
 
 ## 切戻し
