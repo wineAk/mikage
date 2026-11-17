@@ -59,6 +59,18 @@ function createSchemaContract(overrides = []) {
   return [...new Map(rows.map((row) => [`${row.kind}:${row.name}`, row])).values()];
 }
 
+function addDestinationOnlyColumns(contract) {
+  return contract.map((row) => {
+    if (row.kind !== "columns" || !["targets", "incidents"].includes(row.name)) return row;
+    const destinationColumn = row.name === "targets"
+      ? ["is_enabled", "boolean", "NO", "true", "NO", null]
+      : ["notification_pending", "boolean", "NO", "false", "NO", null];
+    const columns = JSON.parse(row.definition);
+    if (columns.some(([name]) => name === destinationColumn[0])) return row;
+    return { ...row, definition: JSON.stringify([...columns, destinationColumn]) };
+  });
+}
+
 test("migration page comparison accepts identical keys and row hashes", () => {
   const rows = [
     { cursor: "alpha", row_hash: "hash-1" },
@@ -71,16 +83,42 @@ test("migration page comparison accepts identical keys and row hashes", () => {
 test("schema contract comparison accepts legacy targets while checking transferred columns and constraints", () => {
   const columns = JSON.stringify([["key","text","NO",null,"",""],["name","text","NO",null,"",""],["url","text","NO",null,"",""],["headers","jsonb","YES",null,"",""]]);
   const source = createSchemaContract([{ kind: "columns", name: "targets", definition: columns }]);
-  assert.equal(compareSchemaContracts(source, structuredClone(source)), true);
-  const modern = structuredClone(source);
-  modern.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify([...JSON.parse(columns), ["is_enabled","boolean","NO","true","YES","ALWAYS"]]);
+  const destination = addDestinationOnlyColumns(structuredClone(source));
+  assert.equal(compareSchemaContracts(source, destination), true);
+  const modern = structuredClone(destination);
+  const modernColumns = JSON.parse(modern.find((row) => row.kind === "columns" && row.name === "targets").definition);
+  modernColumns.find(([name]) => name === "is_enabled")[3] = "false";
+  modern.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify(modernColumns);
+  assert.equal(compareSchemaContracts(source, modern), false);
+  modernColumns.find(([name]) => name === "is_enabled")[3] = "true";
+  modern.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify(modernColumns);
   assert.equal(compareSchemaContracts(source, modern), true);
-  const changedDataColumn = structuredClone(source);
-  changedDataColumn.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify([...JSON.parse(columns), ["new_column","text","YES",null,"",""]]);
+  const changedDataColumn = structuredClone(destination);
+  changedDataColumn.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify([...JSON.parse(columns), ["is_enabled","boolean","NO","true","NO",null], ["new_column","text","YES",null,"NO",null]]);
   assert.equal(compareSchemaContracts(source, changedDataColumn), false);
-  const missingRequired = structuredClone(source);
+  const missingRequired = structuredClone(destination);
   missingRequired.find((row) => row.kind === "index" && row.name === "targets_pkey").definition = "missing";
   assert.equal(compareSchemaContracts(source, missingRequired), false);
+  const missingDestinationColumn = structuredClone(destination);
+  missingDestinationColumn.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify(JSON.parse(columns));
+  assert.equal(compareSchemaContracts(source, missingDestinationColumn), false);
+  const sourceWithEnabled = createSchemaContract([{ kind: "columns", name: "targets", definition: JSON.stringify([...JSON.parse(columns), ["is_enabled","boolean","NO","true","NO",null]]) }]);
+  const destinationWithEnabled = addDestinationOnlyColumns(structuredClone(sourceWithEnabled));
+  assert.equal(compareSchemaContracts(sourceWithEnabled, destinationWithEnabled), true);
+  const destinationWithWrongEnabled = structuredClone(destinationWithEnabled);
+  const wrongEnabledColumns = JSON.parse(destinationWithWrongEnabled.find((row) => row.kind === "columns" && row.name === "targets").definition);
+  wrongEnabledColumns.find(([name]) => name === "is_enabled")[3] = "false";
+  destinationWithWrongEnabled.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify(wrongEnabledColumns);
+  assert.equal(compareSchemaContracts(sourceWithEnabled, destinationWithWrongEnabled), false);
+  const sourceWithDifferentEnabled = createSchemaContract([{ kind: "columns", name: "targets", definition: JSON.stringify([...JSON.parse(columns), ["is_enabled","boolean","NO","false","NO",null]]) }]);
+  assert.equal(compareSchemaContracts(sourceWithDifferentEnabled, destinationWithEnabled), false);
+  for (const [attributeIndex, wrongValue] of [[1, "text"], [2, "YES"], [4, "YES"], [5, "ALWAYS"]]) {
+    const invalidDestination = structuredClone(destination);
+    const invalidColumns = JSON.parse(invalidDestination.find((row) => row.kind === "columns" && row.name === "targets").definition);
+    invalidColumns.find(([name]) => name === "is_enabled")[attributeIndex] = wrongValue;
+    invalidDestination.find((row) => row.kind === "columns" && row.name === "targets").definition = JSON.stringify(invalidColumns);
+    assert.equal(compareSchemaContracts(source, invalidDestination), false);
+  }
   assert.equal(compareSchemaContracts(source, source.slice(0, -1)), false);
 });
 
@@ -91,12 +129,27 @@ test("schema contract accepts destination-only notification recovery state on in
     ["count", "bigint", "NO", "'1'::bigint", "", ""],
   ]);
   const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: columns }]);
-  const target = structuredClone(source);
+  const target = addDestinationOnlyColumns(structuredClone(source));
   target.find((row) => row.kind === "columns" && row.name === "incidents").definition = JSON.stringify([
     ...JSON.parse(columns),
-    ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
+    ["notification_pending", "boolean", "NO", "false", "NO", null],
   ]);
   assert.equal(compareSchemaContracts(source, target), true);
+  const missingRecoveryColumn = structuredClone(target);
+  missingRecoveryColumn.find((row) => row.kind === "columns" && row.name === "incidents").definition = columns;
+  assert.equal(compareSchemaContracts(source, missingRecoveryColumn), false);
+  const wrongRecoveryDefault = structuredClone(target);
+  const wrongRecoveryColumns = JSON.parse(wrongRecoveryDefault.find((row) => row.kind === "columns" && row.name === "incidents").definition);
+  wrongRecoveryColumns.find(([name]) => name === "notification_pending")[3] = "true";
+  wrongRecoveryDefault.find((row) => row.kind === "columns" && row.name === "incidents").definition = JSON.stringify(wrongRecoveryColumns);
+  assert.equal(compareSchemaContracts(source, wrongRecoveryDefault), false);
+  for (const [attributeIndex, wrongValue] of [[1, "text"], [2, "YES"], [4, "YES"], [5, "ALWAYS"]]) {
+    const invalidDestination = structuredClone(target);
+    const invalidColumns = JSON.parse(invalidDestination.find((row) => row.kind === "columns" && row.name === "incidents").definition);
+    invalidColumns.find(([name]) => name === "notification_pending")[attributeIndex] = wrongValue;
+    invalidDestination.find((row) => row.kind === "columns" && row.name === "incidents").definition = JSON.stringify(invalidColumns);
+    assert.equal(compareSchemaContracts(source, invalidDestination), false);
+  }
 });
 
 test("schema contract ignores incident column order while checking every column definition", () => {
@@ -111,14 +164,33 @@ test("schema contract ignores incident column order while checking every column 
     ["keyword", "text", "NO", "'''unknown''::text'::text", "", ""],
     ["instatus_id", "text", "YES", null, "", ""],
     ["googlechat_name", "text", "YES", null, "", ""],
-    ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
+    ["notification_pending", "boolean", "NO", "false", "NO", null],
   ]);
   const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: sourceColumns }]);
-  const target = createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]);
+  const target = addDestinationOnlyColumns(createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]));
 
   assert.equal(compareSchemaContracts(source, target), true);
-  target.find((row) => row.kind === "columns" && row.name === "incidents").definition = targetColumns.replace("YES", "NO");
+  const changedColumns = JSON.parse(target.find((row) => row.kind === "columns" && row.name === "incidents").definition);
+  changedColumns.find(([name]) => name === "googlechat_name")[2] = "NO";
+  target.find((row) => row.kind === "columns" && row.name === "incidents").definition = JSON.stringify(changedColumns);
   assert.equal(compareSchemaContracts(source, target), false);
+});
+
+test("schema contract normalizes column order for each transferred table", () => {
+  const source = createSchemaContract([
+    { kind: "columns", name: "targets", definition: JSON.stringify([["key", "text", "NO", null, "NO", null], ["name", "text", "NO", null, "NO", null]]) },
+    { kind: "columns", name: "logs", definition: JSON.stringify([["id", "integer", "NO", null, "YES", "BY DEFAULT"], ["target_key", "text", "NO", null, "NO", null]]) },
+    { kind: "columns", name: "incidents", definition: JSON.stringify([["id", "bigint", "NO", null, "NO", null], ["keyword", "text", "NO", "'''unknown''::text'::text", "NO", null]]) },
+    { kind: "columns", name: "watch_target_states", definition: JSON.stringify([["target_key", "text", "NO", null, "NO", null], ["last_checked_at", "timestamp with time zone", "YES", null, "NO", null]]) },
+  ]);
+  const target = addDestinationOnlyColumns(createSchemaContract([
+    { kind: "columns", name: "targets", definition: JSON.stringify([["name", "text", "NO", null, "NO", null], ["key", "text", "NO", null, "NO", null]]) },
+    { kind: "columns", name: "logs", definition: JSON.stringify([["target_key", "text", "NO", null, "NO", null], ["id", "integer", "NO", null, "YES", "BY DEFAULT"]]) },
+    { kind: "columns", name: "incidents", definition: JSON.stringify([["keyword", "text", "NO", "'''unknown''::text'::text", "NO", null], ["id", "bigint", "NO", null, "NO", null]]) },
+    { kind: "columns", name: "watch_target_states", definition: JSON.stringify([["last_checked_at", "timestamp with time zone", "YES", null, "NO", null], ["target_key", "text", "NO", null, "NO", null]]) },
+  ]));
+
+  assert.equal(compareSchemaContracts(source, target), true);
 });
 
 test("schema contract rejects incident defaults that differ from Supabase", () => {
@@ -129,10 +201,10 @@ test("schema contract rejects incident defaults that differ from Supabase", () =
   const targetColumns = JSON.stringify([
     ["keyword", "text", "NO", "'unknown'::text", "", ""],
     ["count", "bigint", "NO", "1", "", ""],
-    ["notification_pending", "boolean", "NO", "false", "YES", "ALWAYS"],
+    ["notification_pending", "boolean", "NO", "false", "NO", null],
   ]);
   const source = createSchemaContract([{ kind: "columns", name: "incidents", definition: sourceColumns }]);
-  const target = createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]);
+  const target = addDestinationOnlyColumns(createSchemaContract([{ kind: "columns", name: "incidents", definition: targetColumns }]));
 
   assert.equal(compareSchemaContracts(source, target), false);
 });
@@ -145,7 +217,7 @@ test("schema contract permits destination-only migration objects missing from Su
     { kind: "index", name: "idx_logs_created_at", definition: "source-index" },
     { kind: "trigger", name: "page_cache_revision_logs", definition: "missing" },
   ]);
-  const target = createSchemaContract([{ kind: "index", name: "idx_logs_created_at", definition: "source-index" }]);
+  const target = addDestinationOnlyColumns(createSchemaContract([{ kind: "index", name: "idx_logs_created_at", definition: "source-index" }]));
   assert.equal(compareSchemaContracts(source, target), true);
 
   const missingDestinationObject = structuredClone(target);

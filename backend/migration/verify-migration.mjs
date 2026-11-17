@@ -167,24 +167,46 @@ export const schemaContractQuery = `
 `;
 
 export function compareSchemaContracts(sourceRows, targetRows) {
-  const normalizeRows = (rows) => rows.map((row) => {
+  const destinationOnlyColumnDefinitions = new Map([
+    ["targets:is_enabled", ["is_enabled", "boolean", "NO", "true", "NO", null]],
+    ["incidents:notification_pending", ["notification_pending", "boolean", "NO", "false", "NO", null]],
+  ]);
+  const sourceTargetsColumns = sourceRows.find((row) => row.kind === "columns" && row.name === "targets");
+  let sourceHasEnabled = false;
+  try {
+    sourceHasEnabled = JSON.parse(sourceTargetsColumns?.definition ?? "[]").some(([name]) => name === "is_enabled");
+  } catch {
+    return false;
+  }
+  const hasExpectedDestinationOnlyColumns = [...destinationOnlyColumnDefinitions].every(([key, expectedColumn]) => {
+    const [tableName] = key.split(":");
+    const row = targetRows.find((candidate) => candidate.kind === "columns" && candidate.name === tableName);
+    try {
+      return JSON.parse(row?.definition ?? "[]").some((column) => JSON.stringify(column) === JSON.stringify(expectedColumn));
+    } catch {
+      return false;
+    }
+  });
+  if (!hasExpectedDestinationOnlyColumns) return false;
+
+  const normalizeRows = (rows, isSource) => rows.map((row) => {
     if (row.kind !== "columns") return row;
     try {
       const destinationOnlyColumns = row.name === "targets"
-        ? ["is_enabled"]
-        : row.name === "incidents"
+        ? (!isSource && !sourceHasEnabled ? ["is_enabled"] : [])
+        : row.name === "incidents" && !isSource
           ? ["notification_pending"]
           : [];
       const columns = JSON.parse(row.definition)
         .filter((column) => !destinationOnlyColumns.includes(column[0]))
-        .sort(([leftName], [rightName]) => leftName.localeCompare(rightName));
+        .sort(([leftName], [rightName]) => leftName < rightName ? -1 : leftName > rightName ? 1 : 0);
       return { ...row, definition: JSON.stringify(columns) };
     } catch {
       return row;
     }
   });
-  const normalizedSourceRows = normalizeRows(sourceRows);
-  const normalizedTargetRows = normalizeRows(targetRows);
+  const normalizedSourceRows = normalizeRows(sourceRows, true);
+  const normalizedTargetRows = normalizeRows(targetRows, false);
   const sourceMap = new Map(normalizedSourceRows.map((row) => [`${row.kind}:${row.name}`, row.definition]));
   const targetMap = new Map(normalizedTargetRows.map((row) => [`${row.kind}:${row.name}`, row.definition]));
   if (sourceMap.size !== sourceRows.length || targetMap.size !== targetRows.length) return false;
