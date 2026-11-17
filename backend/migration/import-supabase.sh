@@ -73,7 +73,7 @@ target_credentials=(
 )
 
 source_rls_bypass_status="$(
-  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" PGOPTIONS='-c default_transaction_read_only=on' \
+  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" \
     psql "${source_credentials[@]}" --no-psqlrc --quiet --tuples-only --no-align \
       --set=ON_ERROR_STOP=1 \
       --command="SELECT CASE WHEN rolsuper OR rolbypassrls THEN 'ok' ELSE 'missing' END FROM pg_roles WHERE rolname = current_user" \
@@ -122,7 +122,7 @@ if [[ "$target_sequence_status" != "fresh" ]]; then
 fi
 
 source_sequence_status="$(
-  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" PGOPTIONS='-c default_transaction_read_only=on' \
+  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" \
     psql "${source_credentials[@]}" --no-psqlrc --quiet --tuples-only --no-align \
       --set=ON_ERROR_STOP=1 <<'SQL' | tr -d '[:space:]'
 WITH sequence_state AS (
@@ -147,9 +147,13 @@ if [[ "$source_sequence_status" != "ok" ]]; then
 fi
 
 source_read_only_status="$(
-  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" PGOPTIONS='-c default_transaction_read_only=on' \
+  PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" \
     psql "${source_credentials[@]}" --no-psqlrc --quiet --tuples-only --no-align \
-      --set=ON_ERROR_STOP=1 --command="SHOW transaction_read_only" | tr -d '[:space:]'
+      --set=ON_ERROR_STOP=1 <<'SQL' | tr -d '[:space:]'
+BEGIN READ ONLY;
+SHOW transaction_read_only;
+ROLLBACK;
+SQL
 )"
 if [[ "$source_read_only_status" != "on" ]]; then
   printf 'Import refused: source session must be read-only.\n' >&2
@@ -161,7 +165,7 @@ snapshot_arguments=()
 if [[ -n "$snapshot_id" ]]; then
   snapshot_arguments+=("--snapshot=$snapshot_id")
 fi
-PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" PGOPTIONS='-c default_transaction_read_only=on' \
+PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" PGSSLMODE="$source_sslmode" \
   pg_dump "${source_credentials[@]}" \
     "${snapshot_arguments[@]}" \
     --format=custom --data-only --no-owner --no-privileges \

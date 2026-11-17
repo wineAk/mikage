@@ -25,7 +25,6 @@ fi
 
 PGPASSWORD="$MIKAGE_SOURCE_PGPASSWORD" \
 PGSSLMODE=verify-full \
-PGOPTIONS='-c default_transaction_read_only=on' \
 psql \
   --host="$MIKAGE_SOURCE_PGHOST" \
   --port="${MIKAGE_SOURCE_PGPORT:-5432}" \
