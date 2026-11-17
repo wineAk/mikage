@@ -132,6 +132,8 @@ UTC 分スロットの予約。有効 target を DB から取得し、`mikage.re
 
 このAPIは通知を送らない。Instatus/Google Chatの送信・interval判断はRenderに残す。Render routeはAPI clientへ切替済みだが、実Gateway接続は未検証。
 
+Render PR Preview（`IS_PULL_REQUEST=true`）では`MIKAGE_PREVIEW_WATCH_ENABLED=true`がない限りwatch routeを503で停止する。有効化後もInstatus/Google Chatへの外部通知を抑止し、監視結果とincident stateだけをDokploy APIへ保存する。Preview環境のDB接続先をstaging DBに設定してからwatchを有効にする。通常Render serviceでは既存動作を維持する。
+
 ## View read API
 
 すべてBearer認証が必要。

@@ -2,6 +2,8 @@
 
 Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQLとschema migrationをdeployし、Supabase staging snapshotのimportと独立verifierも完了している。APIとmaintenance schedulerはComposeの通常serviceとして起動する。watch schedulerは専用 `watch` profileで隔離し、GAS/Render切替が終わるまで起動しない。本番データ移行、実Gateway接続、Render/GAS/scheduler切替は未完了。
 
+Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後もInstatusとGoogle Chatへの作成・更新・解決通知を抑止する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
+
 ## 含まれるもの
 
 - `compose/`: 専用 Postgres・API・migration ワンショット・Render起動scheduler・DB maintenance scheduler

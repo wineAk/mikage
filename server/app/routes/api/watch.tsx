@@ -9,6 +9,7 @@ import {
 import { getWatchSchedule } from "~/library/watch/schedule";
 import { checkTarget } from "~/library/watch/checkTarget";
 import { isAuthorizedWatchExecuteRequest } from "~/library/watch/executeAuth.mjs";
+import { areExternalNotificationsEnabled, isWatchExecutionEnabled } from "~/library/watch/notificationEnvironment.mjs";
 import { isIncidentNotificationDue } from "~/library/watch/incidentNotificationPolicy.mjs";
 import { parseWatchSlot } from "~/library/watch/watchSlot.mjs";
 import {
@@ -112,6 +113,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (!isAuthorizedWatchExecuteRequest(request, process.env.MIKAGE_WATCH_EXECUTE_TOKEN)) {
     return jsonResponse({ error: "Invalid key." }, 401);
   }
+  if (!isWatchExecutionEnabled(process.env)) {
+    return jsonResponse({ error: "Preview watch execution is disabled." }, 503);
+  }
 
   const watchSlot = parseWatchSlot(request.headers.get("X-Mikage-Watch-Slot"));
   if (!watchSlot) {
@@ -125,6 +129,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   try {
+    const externalNotificationsEnabled = areExternalNotificationsEnabled(process.env);
     const reservation = await fetchMikageApi<{
       selected_target_keys: string[];
       selected_target_names: Record<string, string>;
@@ -296,7 +301,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         let googleChatName = incident.googlechat_name;
         let instatusUrl: string | null = null;
 
-        if (pageId && component) {
+        if (externalNotificationsEnabled && pageId && component) {
           if (!instatusId) {
             const instatusResult = await createIncidentInstatus({
               started: new Date(incident.created_at).toISOString(),
@@ -320,14 +325,16 @@ export async function loader({ request }: Route.LoaderArgs) {
           instatusUrl = `https://${subDomain}.instatus.com/${instatusId}`;
         }
 
-        if (!googleChatName) {
-          const googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
-          googleChatName = googleChatResult?.thread?.name ?? null;
-          if (googleChatName) {
+        if (externalNotificationsEnabled) {
+          if (!googleChatName) {
+            const googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
+            googleChatName = googleChatResult?.thread?.name ?? null;
+            if (googleChatName) {
+              await updateThreadGoogleChat(errors, googleChatName);
+            }
+          } else {
             await updateThreadGoogleChat(errors, googleChatName);
           }
-        } else {
-          await updateThreadGoogleChat(errors, googleChatName);
         }
 
         await fetchMikageApi("watch-incidents", {
@@ -345,14 +352,17 @@ export async function loader({ request }: Route.LoaderArgs) {
           signal: request.signal,
         });
 
+        if (!externalNotificationsEnabled) {
+          return { status: "recorded_without_notifications" };
+        }
         return { status: isNewIncident ? "notified" : "updated" };
       }
 
       if (errors.length === 0 && incident) {
-        if (incident.googlechat_name) {
+        if (externalNotificationsEnabled && incident.googlechat_name) {
           await resolveThreadGoogleChat([], incident.googlechat_name);
         }
-        if (incident.instatus_id && pageId && component) {
+        if (externalNotificationsEnabled && incident.instatus_id && pageId && component) {
           await resolveIncidentInstatus(incident.instatus_id, {
             started: now.toISOString(),
             page_id: pageId,
