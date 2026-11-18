@@ -1,6 +1,6 @@
 # 監視 API 契約（実装中）
 
-本ドキュメントは専用 Compose app 内のAPI endpointを記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。Supabase staging snapshotのimportと独立verifierは完了した。VPS Caddyは共通routeで `/office/mikage/*` を `/gw/*` へ転送する設定に変更されたとユーザーから報告があった。APIの `/gw` routeはfeature branchへ追加済みだが、Dokployへはまだdeployしていないため、Gateway実通信、POST保存、CloudFront policy/cache/logging、通知運用、本番データ移行とscheduler切替は未確認・未完了。
+本ドキュメントは専用 Compose app 内のAPI endpointを記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。N094のDokployには旧Supabase staging snapshotをimport・検証済みで、現在のAPI、PostgreSQL、maintenance schedulerは稼働中。`/gw` routeを含むbranchもdeploy済み。公開Gatewayの未認証GETは401、未知pathは404を返すことを確認した。Bearer付きRender経由GET/POSTの実保存、CloudFront policy/cache/logging、通知運用、本番sourceの最終データ移行とscheduler切替は未確認・未完了。
 
 ## 認証
 
@@ -180,7 +180,7 @@ Render serverは `MIKAGE_GATEWAY_BASE_URL` に `https://gw.inter.dedyn.io` を�
 
 APIは `/gw` の上記method/pathを既存handlerへ内部dispatchし、既存の認証・validation・DB処理を再利用する。query stringとrequest bodyを保持する。未認証は401、未定義pathと誤methodは404。JSON request bodyは1 MBを上限とする。dot segmentとpercent-encoded dot segmentを含むGateway pathは404となり、Gateway namespace外へdispatchしない。管理routeは `/gw` route tableへ登録せず、`/admin`、`/admin.js`、`/v1/admin/*` は公開Gatewayから利用できない。
 
-この変更はfeature branchのAPI code/docだけで、Dokploy/VPS/CloudFront/Renderの設定は変更しない。Dokploy deploy後のBearer付きGateway通信、POST保存/read-back、CloudFront policy/cache/logging、N094 public-ingress boundaryは別途実環境確認が必要。本番Supabase dump/load/sequence reconciliation、scheduler cutover、観察期間も未完了。Supabase staging snapshotはDokploy DBへimportされ、独立検証済み。
+現行feature branchはDokployへdeploy済みで、Caddyの共通routeも反映済みとのユーザー報告がある。公開Gatewayではhealth 200、未認証の既知route 401、未知routeと管理path 404を外形確認した。Bearer付きRender経由GET/POSTのread-back、CloudFrontのAuthorization/query/cache/logging設定、N094のLAN外ingress境界は未検証。本番sourceの最終dump/import/sequence reconciliation、GAS・Supabase cron・watch schedulerの切替、staging観察期間も未完了。N094にあるimport済みデータは旧staging snapshotであり、本番sourceの現在値ではない。
 
 Compose `watch-scheduler` is isolated by the `watch` profile; the local override does not control whether the service is included. Enable the profile only after the GAS/Render cutover is approved, and set `WATCH_SCHEDULER_ENABLED=true` plus its Render URL/token in the Dokploy service environment. It calls Render `/api/v1/watch` every minute using a Bearer header and has no database credentials or network access. `maintenance-scheduler` starts with the default Compose services, uses its dedicated role to prune logs/incidents at JST month start 03:00 according to event time, and idempotency batches according to `saved_at`; it reindexes logs/incidents concurrently at 03:05/03:07. Each maintenance job checks the migration verification gate before running. Scheduler state is stored in service-specific named volumes. Watch health becomes degraded after three minutes without success; maintenance health becomes degraded 15 minutes after a scheduled job remains unsuccessful. Missed work does not catch up after a restart. Dokploy health alert routing and notification destinations remain unconfigured.
 

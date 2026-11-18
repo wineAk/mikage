@@ -1,6 +1,6 @@
 # Mikage 専用 PostgreSQL / 監視 API
 
-Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQLとschema migrationをdeployし、Supabase staging snapshotのimportと独立verifierも完了している。APIとmaintenance schedulerはComposeの通常serviceとして起動する。watch schedulerは専用 `watch` profileで隔離し、GAS/Render切替が終わるまで起動しない。Gateway用API `/gw` routeはfeature branchへ実装済みだが、Dokployへはまだdeployしていない。本番データ移行、Bearer付きGateway実通信、Render/GAS/scheduler切替は未完了。
+Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQL、schema migration、API、maintenance schedulerをdeploy済みで、watch schedulerは専用 `watch` profileで隔離している。N094には過去のSupabase staging snapshotをimport・検証済みだが、現在のsource件数とは一致しないため本番データとして扱わない。Gateway用API `/gw` routeを含むbranchはDokployへdeploy済み。公開Gatewayでは未認証GETが401、未知routeが404を返すことを確認したが、Bearer付きGET/POSTのRender経由実通信とCloudFrontのcache/query/logging設定は未確認。本番sourceの最終import、Render/GAS/Supabase cronの切替、watch scheduler有効化は未完了。
 
 Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後もInstatusとGoogle Chatへの作成・更新・解決通知を抑止する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
 
@@ -13,12 +13,12 @@ Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WA
 
 ## 含まれないもの（ルート計画どおり）
 
-- Supabase実データ移行の実行、Render production変更、GAS停止、scheduler有効化（import / verify用の手動toolingと初回Dokploy deployは完了）
-- Dokploy deploy後のBearer付きRender-to-Gateway GET/POST実接続検証
+- Supabase本番sourceからの最終データ移行、Render production変更、GAS停止、Supabase cron停止、watch scheduler有効化
+- Bearer付きRender-to-Gateway GET/POST実接続とCloudFront policy/cache/logging検証
 
 ## Dokploy運用・切替手順
 
-本番切替、実Gateway検証、Render/GAS停止、切戻しの順序と停止条件は [deployment-runbook.md](./docs/deployment-runbook.md) を参照する。DokployへのDB/API deploymentとstaging snapshotの移行は完了しているが、本番データ移行とアプリの接続先切替は未実施。
+本番切替、実Gateway検証、Render/GAS停止、切戻しの順序と停止条件は [deployment-runbook.md](./docs/deployment-runbook.md) を参照する。DokployへのDB/API deploymentと旧staging snapshotの移行は完了している。本番sourceの最終import、stagingのRender実接続と観察、本番アプリの接続先切替は未完了。
 
 ## ローカル起動
 
@@ -96,7 +96,7 @@ docker compose --profile migration run --rm migration-verify
 
 schema照合では列名で定義を対応付けるため列の並び順は問わない。共通列の型・nullable・default・identityなどは厳密比較し、移行先専用の `targets.is_enabled` と `incidents.notification_pending` はmigration定義どおり存在し属性が一致することを別途確認する。Supabase側に `targets.is_enabled` がある場合はその属性も移行先と厳密比較する。`information_schema.columns.column_default` はPostgreSQLが同じ値を返す式でもcast・引用符表記が異なれば不一致として止め、default checkは緩めない。Supabase `incidents.keyword` / `count` の実式との差はversioned migration `015_incident_default_parity.sql` でDokploy側を合わせる。import前に新しいmigrationを適用し、schema-only preflightを再実行して成功を確認する。
 
-2つ目のread-only verifierはsource/destinationのschema contractを確認してから、両DBのデータを1000行ずつ比較し、target key / 各行内容 / 有効状態 / sequence / FK / 未使用scheduler lockを確認する。schema contractでは移行対象4表の列・制約と移行に関係するindexをsource/destinationで照合する。revision/idempotency/auditなどdestination専用table、sequence、function、index、triggerはdestinationで必須のものとして確認し、source側に存在することは要求しない。legacy `targets.is_enabled`はsourceに存在する場合だけ値を保持し、なければ全targetをenabledとして照合する。さらに有効targetのURLだけをhostname allowlist検証する。disabled targetは監視APIから使われないためこのURL gateの対象外だが、再有効化前には管理APIでallowlist検証される。画面・ログへ列値や `headers` は出さず、照合成功だけを表示する。staging verifierはsource exported snapshotをimportし、本番verifierはsource writer freezeを前提にする。watch/maintenance各schedulerは常に1 replicaで動かす。ローカル・stagingとも実データ移行はまだ実行していない。
+2つ目のread-only verifierはsource/destinationのschema contractを確認してから、両DBのデータを1000行ずつ比較し、target key / 各行内容 / 有効状態 / sequence / FK / 未使用scheduler lockを確認する。schema contractでは移行対象4表の列・制約と移行に関係するindexをsource/destinationで照合する。revision/idempotency/auditなどdestination専用table、sequence、function、index、triggerはdestinationで必須のものとして確認し、source側に存在することは要求しない。legacy `targets.is_enabled`はsourceに存在する場合だけ値を保持し、なければ全targetをenabledとして照合する。さらに有効targetのURLだけをhostname allowlist検証する。disabled targetは監視APIから使われないためこのURL gateの対象外だが、再有効化前には管理APIでallowlist検証される。画面・ログへ列値や `headers` は出さず、照合成功だけを表示する。staging verifierはsource exported snapshotをimportし、本番verifierはsource writer freezeを前提にする。watch/maintenance各schedulerは常に1 replicaで動かす。N094には以前のstaging snapshotをimport・検証済みだが、sourceが稼働を続けているため現行件数とは差がある。本番importでは空の移行先へsource writerを停止した状態で再移行する。
 
 管理API、監視API、View previewのいずれもtarget `headers` を同一構造制約（HTTP header名、string値、最大100件、CR/LFなし、8KB以下）で検証する。API側preview許可hostとRender側preview許可hostはunit testで同じ集合か確認する。preview hostは既存のpreview対象制限であり、`MIKAGE_TARGET_ALLOWED_HOSTS`より狭いsubsetである。
 
