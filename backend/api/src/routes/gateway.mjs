@@ -6,12 +6,17 @@ const gatewayPathsByRequest = new Map(
 );
 
 function isGatewayPath(rawPath) {
-  if (rawPath.toLowerCase().startsWith("/gw")) return true;
+  if (isGatewayPrefix(rawPath)) return true;
   try {
-    return decodeURIComponent(rawPath).toLowerCase().startsWith("/gw");
+    return isGatewayPrefix(decodeURIComponent(rawPath));
   } catch {
     return false;
   }
+}
+
+function isGatewayPrefix(path) {
+  const normalizedPath = path.toLowerCase();
+  return normalizedPath === "/gw" || normalizedPath.startsWith("/gw/");
 }
 
 export function gatewayDispatchMiddleware(request, response, next) {

@@ -140,6 +140,8 @@ test("未定義Gateway pathと誤methodはmigration gateより先に404になる
     const response = await requestRaw(requestPath, { method });
     assert.equal(response.status, 404, `${method} ${requestPath}`);
   }
+  assert.equal((await requestRaw("/gwharmless")).status, 404);
+  assert.equal((await requestRaw("/%67w/view-targets")).status, 404);
 });
 
 test("dot segmentとencoded dot segmentでGateway外のadmin routeへ到達しない", async () => {
