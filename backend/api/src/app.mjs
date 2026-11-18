@@ -7,12 +7,14 @@ import { watchResultsRouter } from "./routes/watch-results.mjs";
 import { viewRouter } from "./routes/view.mjs";
 import { adminRouter } from "./routes/admin.mjs";
 import { watchIncidentsRouter } from "./routes/watch-incidents.mjs";
+import { gatewayDispatchMiddleware } from "./routes/gateway.mjs";
 import { isAllowedAdminHost, isAdminRequestPath } from "./admin-host.mjs";
 import { config } from "./config.mjs";
 
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
+  app.use(gatewayDispatchMiddleware);
   app.use((request, response, next) => {
     if (isAdminRequestPath(request.path) && !isAllowedAdminHost(request.get("host"), config.allowedAdminHosts)) {
       response.status(404).json({ error: "見つかりません。" });

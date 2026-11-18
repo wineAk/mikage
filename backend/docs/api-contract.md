@@ -1,6 +1,6 @@
 # 監視 API 契約（実装中）
 
-本ドキュメントは専用 Compose app 内で実装済みの endpoint を記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。Supabase staging snapshotのimportと独立verifierは完了した。本番データ移行、実Gateway/private hop接続、Renderからの実通信、schedulerの運用検証は未完了。
+本ドキュメントは専用 Compose app 内のAPI endpointを記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。Supabase staging snapshotのimportと独立verifierは完了した。VPS Caddyは共通routeで `/office/mikage/*` を `/gw/*` へ転送する設定に変更されたとユーザーから報告があった。APIの `/gw` routeはfeature branchへ追加済みだが、Dokployへはまだdeployしていないため、Gateway実通信、POST保存、CloudFront policy/cache/logging、通知運用、本番データ移行とscheduler切替は未確認・未完了。
 
 ## 認証
 
@@ -160,25 +160,27 @@ HTTPS URL、資格情報/fragmentなし、完全一致target host allowlist、HT
 
 監視APIもenabled target全件のURL/headersを同じ制約で検査し、1件でも不正ならURL/header値を含めず503を返す。移行verifierはsource/destination両方のenabled target hostが `MIKAGE_TARGET_ALLOWED_HOSTS` に含まれることを切替前に確認する。disabled targetは予約/API結果から除外され、再有効化時にadmin APIがURL/headersを再検証する。View preview proxyはHTTPS、URL長、headers形式、個別の既存許可host群との完全一致を検査する。
 
-## Gateway / 未完了範囲
+## Gateway API
 
-Render serverは `MIKAGE_GATEWAY_BASE_URL` にGateway originを、`MIKAGE_API_BEARER_TOKEN` にserver-only Bearerを設定し、`/office/mikage/<source>` を呼ぶ。watch起動endpoint `/api/v1/watch` は `MIKAGE_WATCH_EXECUTE_TOKEN` を `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。source routingは以下の対応にする。
+Render serverは `MIKAGE_GATEWAY_BASE_URL` に `https://gw.inter.dedyn.io` を設定し、`MIKAGE_API_BEARER_TOKEN` をAuthorization headerへ設定して `/office/mikage/<source>` を呼ぶ。VPS Caddyの共通routeはprefixを `/gw/` に置き換えて `https://mikage.inter.dedyn.io` へ転送する。Caddyで個別source/pathの許可一覧は持たず、APIが公開routeを限定する。`X-Origin-Verify` はCaddyからAPIへ転送しない。watch起動endpoint `/api/v1/watch` は別tokenを `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。
 
-| source | method | API endpoint |
-|---|---|---|
-| `watch-targets` | GET | `/v1/monitoring/targets` |
-| `watch-reservations` | POST | `/v1/watch/reservations` |
-| `watch-results` | POST | `/v1/watch/results` |
-| `watch-state` | GET | `/v1/watch/state` |
-| `watch-incidents` | POST | `/v1/watch/incidents` |
-| `view-targets` | GET | `/v1/view/targets` |
-| `view-logs` | GET | `/v1/view/logs` |
-| `view-errors` | GET | `/v1/view/errors` |
-| `view-incidents` | GET | `/v1/view/incidents` |
-| `view-revision` | GET | `/v1/view/revision` |
-| `view-target-proxy` | GET | `/v1/view/target-proxy` |
+| Render source | method | Gateway API path | 既存handler |
+|---|---|---|---|
+| `watch-targets` | GET | `/gw/watch-targets` | `/v1/monitoring/targets` |
+| `watch-reservations` | POST | `/gw/watch-reservations` | `/v1/watch/reservations` |
+| `watch-results` | POST | `/gw/watch-results` | `/v1/watch/results` |
+| `watch-state` | GET | `/gw/watch-state` | `/v1/watch/state` |
+| `watch-incidents` | POST | `/gw/watch-incidents` | `/v1/watch/incidents` |
+| `view-targets` | GET | `/gw/view-targets` | `/v1/view/targets` |
+| `view-target-proxy` | GET | `/gw/view-target-proxy` | `/v1/view/target-proxy` |
+| `view-logs` | GET | `/gw/view-logs` | `/v1/view/logs` |
+| `view-errors` | GET | `/gw/view-errors` | `/v1/view/errors` |
+| `view-incidents` | GET | `/gw/view-incidents` | `/v1/view/incidents` |
+| `view-revision` | GET | `/gw/view-revision` | `/v1/view/revision` |
 
-`gateway-office-mikage.caddy` is a repository route fragment and `gateway-setup.md` documents the integration gates; neither is installed on the VPS. VPS private hop, Caddy validation/deployment, Render-to-Gateway traffic, production Supabase dump/load/sequence reconciliation, Dokploy service Domains, and N094 network boundary verification remain incomplete. A staging Supabase snapshot has been imported into the Dokploy DB and passed independent verification.
+APIは `/gw` の上記method/pathを既存handlerへ内部dispatchし、既存の認証・validation・DB処理を再利用する。query stringとrequest bodyを保持する。未認証は401、未定義pathと誤methodは404。JSON request bodyは1 MBを上限とする。dot segmentとpercent-encoded dot segmentを含むGateway pathは404となり、Gateway namespace外へdispatchしない。管理routeは `/gw` route tableへ登録せず、`/admin`、`/admin.js`、`/v1/admin/*` は公開Gatewayから利用できない。
+
+この変更はfeature branchのAPI code/docだけで、Dokploy/VPS/CloudFront/Renderの設定は変更しない。Dokploy deploy後のBearer付きGateway通信、POST保存/read-back、CloudFront policy/cache/logging、N094 public-ingress boundaryは別途実環境確認が必要。本番Supabase dump/load/sequence reconciliation、scheduler cutover、観察期間も未完了。Supabase staging snapshotはDokploy DBへimportされ、独立検証済み。
 
 Compose `watch-scheduler` is isolated by the `watch` profile; the local override does not control whether the service is included. Enable the profile only after the GAS/Render cutover is approved, and set `WATCH_SCHEDULER_ENABLED=true` plus its Render URL/token in the Dokploy service environment. It calls Render `/api/v1/watch` every minute using a Bearer header and has no database credentials or network access. `maintenance-scheduler` starts with the default Compose services, uses its dedicated role to prune logs/incidents at JST month start 03:00 according to event time, and idempotency batches according to `saved_at`; it reindexes logs/incidents concurrently at 03:05/03:07. Each maintenance job checks the migration verification gate before running. Scheduler state is stored in service-specific named volumes. Watch health becomes degraded after three minutes without success; maintenance health becomes degraded 15 minutes after a scheduled job remains unsuccessful. Missed work does not catch up after a restart. Dokploy health alert routing and notification destinations remain unconfigured.
 

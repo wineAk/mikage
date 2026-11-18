@@ -1,6 +1,6 @@
 # Mikage 専用 PostgreSQL / 監視 API
 
-Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQLとschema migrationをdeployし、Supabase staging snapshotのimportと独立verifierも完了している。APIとmaintenance schedulerはComposeの通常serviceとして起動する。watch schedulerは専用 `watch` profileで隔離し、GAS/Render切替が終わるまで起動しない。本番データ移行、実Gateway接続、Render/GAS/scheduler切替は未完了。
+Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQLとschema migrationをdeployし、Supabase staging snapshotのimportと独立verifierも完了している。APIとmaintenance schedulerはComposeの通常serviceとして起動する。watch schedulerは専用 `watch` profileで隔離し、GAS/Render切替が終わるまで起動しない。Gateway用API `/gw` routeはfeature branchへ実装済みだが、Dokployへはまだdeployしていない。本番データ移行、Bearer付きGateway実通信、Render/GAS/scheduler切替は未完了。
 
 Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後もInstatusとGoogle Chatへの作成・更新・解決通知を抑止する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
 
@@ -14,7 +14,7 @@ Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WA
 ## 含まれないもの（ルート計画どおり）
 
 - Supabase実データ移行の実行、Render production変更、GAS停止、scheduler有効化（import / verify用の手動toolingと初回Dokploy deployは完了）
-- Render-to-Gatewayの実接続検証
+- Dokploy deploy後のBearer付きRender-to-Gateway GET/POST実接続検証
 
 ## Dokploy運用・切替手順
 
@@ -110,7 +110,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml --profile test 
 
 `integration-tests` は `test` profile限定で、通常のDokploy deployでは起動しない。fixture投入のため管理roleを使うのはテストserviceのみ。
 
-Render source allowlist、Caddy method/path rewrite、Dokploy Host routing headerの対応はrepository rootから `node --test backend/docs/gateway-contract.test.mjs` で確認する。この契約testはCompose test containerへ持ち込まず、Git checkout上で実行する。
+Render source allowlist、API `/gw` method/path、既存API endpointへのdispatch対応はrepository rootから `node --test backend/docs/gateway-contract.test.mjs` で確認する。この契約testはCompose test containerへ持ち込まず、Git checkout上で実行する。
 
 ## Dokploy 運用境界
 
@@ -119,8 +119,8 @@ Render source allowlist、Caddy method/path rewrite、Dokploy Host routing heade
 - named volume `mikage_postgres_data` は他 DB と共有しない。
 - `mikage_watch_scheduler_state` と `mikage_maintenance_scheduler_state` は各scheduler専用のヘルス状態保存用volume。DBバックアップ用途ではなく、再起動後も最終成功時刻を判定するために使う。
 - DomainsはDokployの当該Compose app内のserviceにのみ紐付ける。scheduleは専用Compose service内に置く。
-- APIのLAN向けDomainだけを対象Compose appのDomains tabに登録し、container port `3100` とHTTPSを指定する。証明書は `*.inter.dedyn.io` を使う。公開Gateway domainはAPI serviceに割り当てず、VPS Gatewayは既存Tailscale経路からN094 Tailscale IPへHTTPS接続する。Dokployがdeploy時にTraefik labels/networkを自動付加するため、Composeへ手動router labelや共有routing networkを記述しない。Advanced → NetworksでDomainが必要なAPIのみを`dokploy-network`へ接続し、他のCompose serviceは共有networkから外して独自networkに置く。Isolated Deployments toggleはv0.30以降deprecatedのため使用しない。deploy前にPreview Composeと`docker network inspect`で対象appの各serviceを確認する。API `/health` はBearer認証なしなので公開domainへ出さない。
-- Caddyは`MIKAGE_API_UPSTREAM=https://<N094-Tailscale-IP>`へ接続し、`Host` と TLS SNI を `MIKAGE_API_HOST` に設定して証明書を検証する。Tailscale経路を使うためDNSのLAN IPへは接続しない。Dokploy TraefikはHostでserviceを選ぶ。
+- APIのLAN向けDomainだけを対象Compose appのDomains tabに登録し、container port `3100` とHTTPSを指定する。証明書は `*.inter.dedyn.io` を使う。公開Gateway domainはAPI serviceに割り当てず、VPS GatewayはACLで許可されたsubnet route経由で `https://mikage.inter.dedyn.io` へHTTPS接続する。ACL変更は行わない。Dokployがdeploy時にTraefik labels/networkを自動付加するため、Composeへ手動router labelや共有routing networkを記述しない。Advanced → NetworksでDomainが必要なAPIのみを`dokploy-network`へ接続し、他のCompose serviceは共有networkから外して独自networkに置く。Isolated Deployments toggleはv0.30以降deprecatedのため使用しない。deploy前にPreview Composeと`docker network inspect`で対象appの各serviceを確認する。API `/health` はBearer認証なしなので公開domainへ出さない。
+- 稼働中Caddyのupstreamは `https://mikage.inter.dedyn.io` で、TLS証明書検証を維持する。Caddyは `/office/mikage/*` を共通routeで `/gw/*` へ転送し、APIが許可routeを限定する。
 - DokployのGit Compose pathは`backend/compose/docker-compose.yml`を指定する。build contextが同directoryから`../api`, `../db`, `../scheduler`を参照することをPreview/buildで確認する。
 - Renderの `MIKAGE_GATEWAY_BASE_URL` はorigin rootの `https://gw.inter.dedyn.io` にする。Render clientが `/office/mikage/<source>` を付けるため、path prefixは設定しない（clientもroot以外を拒否する）。CloudFront behaviorが`/office/mikage/*`をGateway origin groupへ流すこと、Custom Origin Request PolicyでAuthorizationをforwardしquery stringsはすべてforwardすることを確認する。Cache Policyはmanaged `CachingDisabled`（TTLすべて0）。POSTを許可するためCloudFront Allowed Methodsは全7 methodとなるが、Caddyは契約したGET/POST以外を404にする。Managed-AllViewerは既存originのHost routingを変える可能性があるので使わず、Authorizationが標準/リアルタイムログへ記録されないことを確認する。
 - `watch-scheduler` はRender起動用tokenだけを持ち、PostgreSQL/APIの `mikage_internal` networkに参加しない。`maintenance-scheduler` は別serviceとして、`logs`、`incidents`、`watch_result_batches`、`incident_transition_batches` だけを所有する `mikage_maintenance` roleで削除/reindexする。
@@ -128,6 +128,6 @@ Render source allowlist、Caddy method/path rewrite、Dokploy Host routing heade
 - `MIKAGE_ADMIN_ALLOWED_HOSTS` は必須で、管理routeは許可Hostの完全一致だけ応答する。本番ではLAN向けDokploy service domainだけを指定し、公開Gateway Hostは含めない。
 - `MIKAGE_TARGET_ALLOWED_HOSTS` は実際のenabled target URL hostを完全一致で列挙する。管理APIは新規/更新/再有効化時、監視APIは有効targetをRenderへ返す前にURL/headersを検査し、migration verifierはSupabase/移行先の有効targetを照合する。disabled targetは監視・previewで使用しない。未設定または不一致ならfail closedにする。値はDokployのAPI serviceと一時migration-verify serviceへ同じものを設定する。
 
-## Caddy / Gateway（将来）
+## Caddy / Gateway の現在状態
 
-Render → `gw.inter.dedyn.io/office/mikage/<source>` → N094 API のCaddy/private-hop経路は未実装。Render側のGateway clientはfeature branchにあり、実通信は未検証。endpoint契約と未完了範囲は [api-contract.md](./docs/api-contract.md) に記載。
+Render → CloudFront (`gw.inter.dedyn.io`) → RackNerd/GreenCloud Caddy → subnet route → N094 API の経路です。Caddyは共通routeで `/office/mikage/*` を `/gw/*` へ転送し、API側に11個の公開routeを実装しています。このbranchのAPI変更はDokploy未deployのため、現行Gateway実通信は未確認です。CloudFront policy/cache/loggingの実設定、query forwarding、POST保存/read-back、通知failure injection、production migration/cutoverも未完了です。詳細は [gateway-setup.md](./docs/gateway-setup.md) と [api-contract.md](./docs/api-contract.md) を参照。

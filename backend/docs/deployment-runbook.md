@@ -9,7 +9,7 @@
 - schedulerはCompose service内に置き、watch schedulerとmaintenance schedulerをそれぞれ1 replicaで動かす。Dokploy Schedule Jobやhost timerは追加しない。
 - Postgres portはhostへ公開しない。Postgresのnamed volumeは `mikage_postgres_data` 専用とし、既存DBのvolumeと共有しない。
 - Compose serviceのNetworksは対象Dokploy app内だけ設定する。Dokploy Domainsが必要な`api`のみ`dokploy-network`へ接続し、Postgres/migrate/scheduler/test/migration serviceは共有`dokploy-network`から外してCompose定義の専用networkだけに置く。既存serviceやDokploy全体networkの変更はしない。Dokploy v0.30以降に非推奨となったIsolated Deployments toggleは使わず、Advanced → Networksのservice単位Attach/Detachを使う。
-- API serviceにだけLAN向けDokploy Domainを設定する。Domain/DNSとHost allowlistだけでは到達元を制限しない。ユーザーはN094非公開と既存VPS Caddy/Tailscale経路の通信成功を確認済み。今回のdeploymentでは既存network設定に変更を加えず、新API serviceが既存経路経由で応答することと管理DomainがLAN内でだけ到達できることを検証する。admin画面/APIにログイン認証はないため、Domain設定後にLAN外と公開Gateway経路から到達しないことを確認する。Dokploy/Traefik全体設定や他serviceを変更して解決しない。
+- API serviceにだけLAN向けDokploy Domainを設定する。Domain/DNSとHost allowlistだけでは到達元を制限しない。ユーザーはN094非公開と既存VPS Caddy経路の通信成功を確認済み。Gateway upstreamは既存ACLで許可されたsubnet route経由の `https://mikage.inter.dedyn.io` とする。ACLや他のnetwork設定は変更しない。今回のdeploymentでは既存network設定に変更を加えず、新API serviceが既存経路経由で応答することと管理DomainがLAN内でだけ到達できることを検証する。admin画面/APIにログイン認証はないため、Domain設定後にLAN外と公開Gateway経路から到達しないことを確認する。Dokploy/Traefik全体設定や他serviceを変更して解決しない。
 - Renderの `MIKAGE_GATEWAY_BASE_URL` はorigin root `https://gw.inter.dedyn.io` とする。`/office/mikage` はRender clientが付ける。API Bearer、watch execute token、DB passwordは用途ごとに別値を使い、service単位のsecretとして設定する。
 - バックアップは作成しない。N094またはvolumeを失った場合、データを復元できない可能性がある。移行時のstream dumpはバックアップではなく一時転送として扱い、移行後に残さない。
 
@@ -28,7 +28,7 @@
 - [ ] Dokploy Compose環境の `COMPOSE_PROFILES` は空欄にする。通常起動では`postgres`、`migrate`、`api`、`maintenance-scheduler`が起動し、`watch-scheduler`とmigration/test profile serviceは起動しない。`watch` profileはRender/GAS切替の承認後だけ有効にする。
 - [ ] `migration-verify`成功前も`/health`はDB接続を返し、それ以外の全routeが503で閉じることを確認する。health 200はmigration gate通過を意味しない。maintenance schedulerはAPI healthcheck成功後に起動し、各job直前にDB gateを再確認する。
 - [ ] APIの `MIKAGE_ADMIN_ALLOWED_HOSTS` はLAN専用Domainのみ、`MIKAGE_TARGET_ALLOWED_HOSTS` は現在のenabled target hostを完全一致で含む。
-- [ ] API Domain設定後、LAN内と既存VPS Caddy/Tailscale経路から必要なAPI pathへ到達でき、LAN外と公開Gateway経路から管理画面/APIへ到達できないことを実測する。ユーザーが確認した既存network pathや他serviceは変更しない。
+- [ ] API Domain設定後、LAN内と既存VPS Caddyのsubnet routeから必要なAPI pathへ到達でき、LAN外と公開Gateway経路から管理画面/APIへ到達できないことを実測する。Caddy経由の未認証routeは401、admin pathは404との報告があるが、LAN外境界は別途実測する。ユーザーが確認した既存network pathや他serviceは変更しない。
 - [ ] CloudFrontがAuthorizationをoriginへforwardし、queryを保持し、cacheを無効化している。standard/realtime logにAuthorizationが出ないことを確認する。GreenCloud/RackNerd両originでも確認する。
 - [ ] targetのAPI key/Cookieなど既存認証値をローテーションし、staging用とproduction用の通知先を分離する。
 - [ ] `watch-scheduler` は確認完了まで無効。GASとの同時起動を防ぐ停止・再開担当とタイミングを決める。
