@@ -129,18 +129,24 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
 });
 
 test("未定義Gateway pathと誤methodはmigration gateより先に404になる", async () => {
-  for (const [method, requestPath] of [
-    ["GET", "/gw/unknown"],
-    ["POST", "/gw/view-targets"],
-    ["GET", "/gw/watch-results"],
-    ["GET", "/gw/admin"],
-    ["GET", "/gw/admin.js"],
-    ["GET", "/gw/v1/admin/targets"],
-  ]) {
-    const response = await requestRaw(requestPath, { method });
-    assert.equal(response.status, 404, `${method} ${requestPath}`);
+  isMigrationVerified = false;
+  try {
+    for (const [method, requestPath] of [
+      ["GET", "/gw/unknown"],
+      ["POST", "/gw/view-targets"],
+      ["GET", "/gw/watch-results"],
+      ["GET", "/gw/admin"],
+      ["GET", "/gw/admin.js"],
+      ["GET", "/gw/v1/admin/targets"],
+      ["GET", "/gwharmless"],
+      ["GET", "/%67wharmless"],
+    ]) {
+      const response = await requestRaw(requestPath, { method });
+      assert.equal(response.status, 404, `${method} ${requestPath}`);
+    }
+  } finally {
+    isMigrationVerified = true;
   }
-  assert.equal((await requestRaw("/gwharmless")).status, 404);
   assert.equal((await requestRaw("/%67w/view-targets")).status, 404);
 });
 
