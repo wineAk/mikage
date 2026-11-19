@@ -49,7 +49,7 @@ Render PR Previewからのwatch実行/read-back、通知failure injection、独�
 - [ ] API Domain設定後、LAN内と既存VPS Caddyのsubnet routeから必要なAPI pathへ到達でき、LAN外と公開Gateway経路から管理画面/APIへ到達できないことを実測する。Caddy経由の未認証routeは401、admin pathは404との報告があるが、LAN外境界は別途実測する。ユーザーが確認した既存network pathや他serviceは変更しない。
 - [ ] CloudFrontがAuthorizationをoriginへforwardし、queryを保持し、cacheを無効化している。standard/realtime logにAuthorizationが出ないことを確認する。GreenCloud/RackNerd両originでも確認する。
 - [ ] targetのAPI key/Cookieなど既存認証値をローテーションし、staging用とproduction用の通知先を分離する。
-- [ ] `watch-scheduler` は確認完了まで無効。GASとの同時起動を防ぐ停止・再開担当とタイミングを決める。
+- [ ] Production appの`watch-scheduler`は本番切替まで無効にし、GASとの同時起動を防ぐ停止・再開担当とタイミングを決める。独立Staging appは、通知mockと専用tokenの設定後に限り、staging rehearsal/観察用に有効化できる。
 - [ ] healthcheckの失敗を誰が監視し、どこへ通知するかを設定する。Composeのhealth表示だけで監視完了とはみなさない。
 
 一つでも満たさない場合、staging接続、migration import、scheduler有効化へ進まない。
