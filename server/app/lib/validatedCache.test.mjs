@@ -185,6 +185,7 @@ test("allows anonymous analytics cookies but bypasses every recognized auth cont
 
 test("hashes the complete cookie and project context without retaining raw values", () => {
   const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
   const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
   try {
     process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-one.example.test";
@@ -196,10 +197,15 @@ test("hashes the complete cookie and project context without retaining raw value
     assert.notEqual(scope, getPageCacheScope(second));
     process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-two.example.test";
     assert.notEqual(scope, getPageCacheScope(first));
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-one.example.test";
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
+    assert.notEqual(scope, getPageCacheScope(first));
     assert.equal(scope.includes("some-private-value"), false);
   } finally {
     if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
     else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
     if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
     else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
   }
@@ -208,21 +214,51 @@ test("hashes the complete cookie and project context without retaining raw value
 test("Gateway base URLはorigin rootに限定し、重複prefixを拒否する", async () => {
   const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
   const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
   try {
     process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test/office/mikage";
     process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+  } finally {
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
+  }
+});
+
+test("Gateway route prefixはStaging namespaceだけを追加許可する", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "../../v1/admin";
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
+    process.env.IS_PULL_REQUEST = "false";
     await assert.rejects(fetchMikageApi("view-targets"), /URLの設定が不正です/);
   } finally {
     if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
     else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
     if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
     else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
   }
 });
 
 async function withGatewayFixture(execute) {
   const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
   const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
   const previousCacheEnabled = process.env.PAGE_CACHE_ENABLED;
   const previousFetch = globalThis.fetch;
   const gatewayOrigin = "https://gateway.example.test";
@@ -255,6 +291,8 @@ async function withGatewayFixture(execute) {
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
     process.env.MIKAGE_GATEWAY_BASE_URL = gatewayOrigin;
     process.env.MIKAGE_API_BEARER_TOKEN = apiToken;
+    delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    delete process.env.IS_PULL_REQUEST;
     process.env.PAGE_CACHE_ENABLED = "true";
     globalThis.fetch = (input, init) => {
       const requestUrl = new URL(input);
@@ -271,10 +309,25 @@ async function withGatewayFixture(execute) {
     else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
     if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
     else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
     if (previousCacheEnabled === undefined) delete process.env.PAGE_CACHE_ENABLED;
     else process.env.PAGE_CACHE_ENABLED = previousCacheEnabled;
   }
 }
+
+test("Staging route prefixを使って同じGateway hostから隔離namespaceへ送る", async () => {
+  await withGatewayFixture(async (state) => {
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
+    process.env.IS_PULL_REQUEST = "true";
+    await fetchMikageApi("view-targets", { query: new URLSearchParams({ source: "preview" }) });
+    assert.equal(state.requests[0].path, "/office/mikage-staging/view-targets");
+    assert.equal(state.requests[0].query.get("source"), "preview");
+    assert.equal(state.requests[0].authorization, "Bearer example-api-token");
+  });
+});
 
 test("disabled page cache reads fresh data without revision API requests", async () => {
   await withGatewayFixture(async state => {

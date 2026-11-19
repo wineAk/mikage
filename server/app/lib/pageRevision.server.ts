@@ -24,6 +24,7 @@ export function getPageCacheScope(request: Request): string | null {
   // 認証値やCookieをキーへ直接保存せず、プロジェクトと利用者の境界を分ける。
   return createHash("sha256").update(JSON.stringify([
     process.env.MIKAGE_GATEWAY_BASE_URL ?? "",
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX ?? "office/mikage",
     process.env.MIKAGE_API_BEARER_TOKEN ?? "",
     "mikage",
     "anonymous",

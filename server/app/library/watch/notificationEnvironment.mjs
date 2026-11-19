@@ -21,5 +21,9 @@ export function getPreviewNotificationFailureMode(environment) {
 }
 
 export function isWatchExecutionEnabled(environment) {
-  return environment.IS_PULL_REQUEST !== "true" || environment.MIKAGE_PREVIEW_WATCH_ENABLED === "true";
+  if (environment.IS_PULL_REQUEST !== "true") return true;
+
+  return environment.MIKAGE_PREVIEW_WATCH_ENABLED === "true"
+    && environment.MIKAGE_PREVIEW_NOTIFICATION_MOCK === "true"
+    && environment.MIKAGE_GATEWAY_ROUTE_PREFIX === "office/mikage-staging";
 }

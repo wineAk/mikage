@@ -38,12 +38,15 @@ test("Render source allowlist and API /gw routes stay aligned", () => {
     assert.deepEqual([route.method, route.apiPath], apiPathsBySource[route.source], `Gateway route ${route.source} must match its API contract`);
   }
   assert.ok(gatewayRouteContracts.every(({ path: routePath }) => !/(?:^|\/)admin(?:\/|\.|$)/i.test(routePath)));
-  assert.match(gatewaySetup, /`\/office\/mikage\/` prefixを `\/gw\/` に置き換えて/);
+  assert.match(gatewaySetup, /共通routeでprefixを `\/gw\/` に置き換えて/);
   assert.match(gatewaySetup, /`https:\/\/mikage\.inter\.dedyn\.io`/);
+  assert.match(renderClient, /MIKAGE_GATEWAY_ROUTE_PREFIX/);
+  assert.match(gatewaySetup, /`office\/mikage-staging`/);
+  assert.match(apiContract, /`MIKAGE_GATEWAY_ROUTE_PREFIX`/);
+  assert.match(apiContract, /Preview[^\n]+watch[^\n]+Staging API/);
   assert.match(gatewaySetup, /query stringはそのまま維持/);
   assert.match(gatewaySetup, /`X-Origin-Verify` はCaddyからAPIへ渡しません/);
-  assert.match(apiContract, /共通routeはprefixを `\/gw\/` に置き換えて/);
-  assert.match(apiContract, /`https:\/\/mikage\.inter\.dedyn\.io`/);
+  assert.match(apiContract, /共通routeは対応するprefixを `\/gw\/` に置き換えて/);
   assert.match(apiContract, /`X-Origin-Verify` はCaddyからAPIへ転送しない/);
   assert.doesNotMatch(gatewaySetup, /MIKAGE_API_(?:UPSTREAM|HOST)|100\.68\.1\.223/);
   assert.doesNotMatch(apiContract, /MIKAGE_API_(?:UPSTREAM|HOST)|100\.68\.1\.223/);

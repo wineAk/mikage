@@ -2,7 +2,9 @@
 
 ## 経路
 
-Render clientは `https://gw.inter.dedyn.io/office/mikage/<source>` を呼びます。CloudFront経由でRackNerdまたはGreenCloudのCaddyへ到達し、Caddyは共通routeで `/office/mikage/` prefixを `/gw/` に置き換えて、`https://mikage.inter.dedyn.io/gw/<source>` へ転送します。pathの残りとquery stringはそのまま維持し、`X-Origin-Verify` はCaddyからAPIへ渡しません。
+Render clientは `MIKAGE_GATEWAY_BASE_URL` に設定したGatewayへ、route prefixとsourceを付けて要求します。Productionでは `MIKAGE_GATEWAY_ROUTE_PREFIX` の既定値 `office/mikage` を使います。CloudFront経由でRackNerdまたはGreenCloudのCaddyへ到達し、Caddyは共通routeでprefixを `/gw/` に置き換えてProduction APIへ転送します。pathの残りとquery stringはそのまま維持し、`X-Origin-Verify` はCaddyからAPIへ渡しません。
+
+Render PR PreviewをStagingへ隔離するときは、Previewだけで `MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` とし、`MIKAGE_API_BEARER_TOKEN`にはStaging API専用値を設定します。両VPSのCaddyには `/office/mikage-staging/` を `/gw/` に置き換え、Dokploy StagingのAPI service domainへ転送する共通routeが必要です。Production prefixとupstreamは変更しません。source名のallowlistは引き続きAPIだけが持ちます。
 
 CaddyにはMikage個別のsource/path allowlistを置きません。公開できるoperationはAPIが持つ `/gw` routeだけです。APIがrouteを持たないpathや誤methodは404になります。`/admin`、`/admin.js`、`/v1/admin/*` はCaddyから転送されても `/gw` namespace内では定義されないため到達できません。
 
@@ -28,7 +30,7 @@ APIの `/gw` dispatchはこれらのmethod/pathだけを既存API routerへ内�
 
 ## CloudFrontとログ
 
-Renderの `MIKAGE_GATEWAY_BASE_URL` は `https://gw.inter.dedyn.io` のままです。Render clientが `/office/mikage/<source>` を追加するため、base URLにpath prefixを付けません。
+Production Renderの `MIKAGE_GATEWAY_BASE_URL` は `https://gw.inter.dedyn.io` のままです。Previewも同じGateway hostを使い、`MIKAGE_GATEWAY_ROUTE_PREFIX` だけをStaging用prefixへ切り替えます。route prefixは `office/mikage` と `office/mikage-staging` の2値に限定し、任意URL pathは受け付けません。
 
 CloudFront設定はこの変更の対象外です。運用確認ではGateway behaviorが既存origin group/failoverを使うこと、Authorizationをoriginへforwardすること、query stringをforwardすること、cacheを無効化すること、POSTを許可することを読み取り確認します。standard/realtime logにAuthorizationやorigin verification secretが記録されないことも確認してください。外部から401/404を見るだけではpolicy、cache、logging設定の証明にはなりません。
 

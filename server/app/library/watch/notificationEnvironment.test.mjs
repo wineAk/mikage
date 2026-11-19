@@ -57,6 +57,22 @@ test("failure injection modeはPreview mock時だけ有効", () => {
 test("Render Previewの監視実行は明示的に有効化するまで停止する", () => {
   assert.equal(isWatchExecutionEnabled({ IS_PULL_REQUEST: "true" }), false);
   assert.equal(isWatchExecutionEnabled({ IS_PULL_REQUEST: "true", MIKAGE_PREVIEW_WATCH_ENABLED: "false" }), false);
-  assert.equal(isWatchExecutionEnabled({ IS_PULL_REQUEST: "true", MIKAGE_PREVIEW_WATCH_ENABLED: "true" }), true);
+  assert.equal(isWatchExecutionEnabled({
+    IS_PULL_REQUEST: "true",
+    MIKAGE_PREVIEW_WATCH_ENABLED: "true",
+    MIKAGE_PREVIEW_NOTIFICATION_MOCK: "true",
+  }), false);
+  assert.equal(isWatchExecutionEnabled({
+    IS_PULL_REQUEST: "true",
+    MIKAGE_PREVIEW_WATCH_ENABLED: "true",
+    MIKAGE_PREVIEW_NOTIFICATION_MOCK: "true",
+    MIKAGE_GATEWAY_ROUTE_PREFIX: "office/mikage",
+  }), false);
+  assert.equal(isWatchExecutionEnabled({
+    IS_PULL_REQUEST: "true",
+    MIKAGE_PREVIEW_WATCH_ENABLED: "true",
+    MIKAGE_PREVIEW_NOTIFICATION_MOCK: "true",
+    MIKAGE_GATEWAY_ROUTE_PREFIX: "office/mikage-staging",
+  }), true);
   assert.equal(isWatchExecutionEnabled({ IS_PULL_REQUEST: "false" }), true);
 });
