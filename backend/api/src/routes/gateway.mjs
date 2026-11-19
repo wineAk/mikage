@@ -18,12 +18,26 @@ function hasGatewayMarker(path) {
   return path.toLowerCase().startsWith("/gw");
 }
 
-export function gatewayDispatchMiddleware(request, response, next) {
+function isAllowedGatewayHost(hostHeader, allowedHosts) {
+  if (typeof hostHeader !== "string" || hostHeader.length === 0) return false;
+  try {
+    return allowedHosts.has(new URL(`http://${hostHeader}`).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
+export function gatewayDispatchMiddleware(request, response, next, allowedGatewayHosts = null) {
   const requestUrl = request.url ?? "/";
   const queryIndex = requestUrl.indexOf("?");
   const rawPath = queryIndex === -1 ? requestUrl : requestUrl.slice(0, queryIndex);
   if (!isGatewayPath(rawPath)) {
     next();
+    return;
+  }
+
+  if (allowedGatewayHosts && !isAllowedGatewayHost(request.get("host"), allowedGatewayHosts)) {
+    response.status(404).json({ error: "見つかりません。" });
     return;
   }
 

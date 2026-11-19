@@ -6,8 +6,9 @@ process.env.PGHOST = "127.0.0.1";
 process.env.PGUSER = "test";
 process.env.PGPASSWORD = "test";
 process.env.PGDATABASE = "test";
-process.env.MIKAGE_API_BEARER_TOKEN = "test-token";
+process.env.MIKAGE_API_BEARER_TOKEN = "test-gateway-bearer-token-dummy-value";
 process.env.MIKAGE_ADMIN_ALLOWED_HOSTS = "admin.example.test";
+delete process.env.MIKAGE_GATEWAY_ALLOWED_HOSTS;
 
 const [{ createApp }, { pool }, { gatewayRouteContracts }] = await Promise.all([
   import("../src/app.mjs"),
@@ -19,6 +20,9 @@ const { config } = await import("../src/config.mjs");
 const originalPoolQuery = pool.query;
 let isMigrationVerified = true;
 pool.query = async (query) => {
+  if (query === "SELECT 1") {
+    return { rows: [{ "?column?": 1 }] };
+  }
   if (query.includes("SELECT data_verified FROM mikage.migration_state")) {
     return { rows: [{ data_verified: isMigrationVerified }] };
   }
@@ -108,7 +112,7 @@ test("Production・Stagingのどちらでも未認証のGateway requestは401に
 
 test("認証済みGateway requestは既存endpointの処理とqueryを再利用する", async () => {
   const targetResponse = await fetch(`${baseUrl}/gw/view-targets`, {
-    headers: { Authorization: "Bearer test-token" },
+    headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
   });
   assert.equal(targetResponse.status, 200);
   assert.deepEqual(await targetResponse.json(), {
@@ -117,7 +121,7 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
 
   const logResponse = await fetch(
     `${baseUrl}/gw/view-logs?keys=&start=2026-11-18T00%3A00%3A00.000Z&end=2026-11-18T01%3A00%3A00.000Z`,
-    { headers: { Authorization: "Bearer test-token" } }
+    { headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" } }
   );
   assert.equal(logResponse.status, 200);
   assert.deepEqual(await logResponse.json(), { data: [] });
@@ -125,7 +129,7 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
   const reservationResponse = await fetch(`${baseUrl}/gw/watch-reservations`, {
     method: "POST",
     headers: {
-      Authorization: "Bearer test-token",
+      Authorization: "Bearer test-gateway-bearer-token-dummy-value",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ slot_start: "2026-11-18T17:00:00.000Z", is_full_run: false }),
@@ -142,9 +146,56 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
   });
 });
 
+test("Gateway Host未設定時はHostを判定せず、現在の挙動を維持する", async () => {
+  assert.equal(config.allowedGatewayHosts, null);
+  const response = await requestRaw("/gw/view-targets", {
+    host: "unlisted.example.test",
+    headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
+  });
+  assert.equal(response.status, 200);
+});
+
+test("Gateway許可HostではGateway routeを受け付け、Host比較は大文字小文字を無視する", async () => {
+  const originalHosts = config.allowedGatewayHosts;
+  config.allowedGatewayHosts = new Set(["gateway.example.test"]);
+  try {
+    const response = await requestRaw("/gw/view-targets", {
+      host: "GATEWAY.EXAMPLE.TEST",
+      headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
+    });
+    assert.equal(response.status, 200);
+  } finally {
+    config.allowedGatewayHosts = originalHosts;
+  }
+});
+
+test("管理画面HostではGatewayを拒否し、Gateway Hostでは管理routeを拒否する", async () => {
+  const originalHosts = config.allowedGatewayHosts;
+  config.allowedGatewayHosts = new Set(["gateway.example.test"]);
+  try {
+    const adminHostGateway = await requestRaw("/gw/view-targets", {
+      host: "admin.example.test",
+      headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
+    });
+    assert.equal(adminHostGateway.status, 404);
+
+    for (const path of ["/admin", "/admin.js", "/v1/admin/targets"]) {
+      const gatewayHostAdmin = await requestRaw(path, { host: "gateway.example.test" });
+      assert.equal(gatewayHostAdmin.status, 404, path);
+    }
+
+    for (const host of ["admin.example.test", "gateway.example.test", "other.example.test"]) {
+      const healthResponse = await requestRaw("/health", { host });
+      assert.equal(healthResponse.status, 200, host);
+    }
+  } finally {
+    config.allowedGatewayHosts = originalHosts;
+  }
+});
+
 test("ProductionとStagingのBearerを分離し、token文字列でrouteを選ばない", async () => {
-  const productionBearer = "example-production-bearer";
-  const stagingBearer = "example-staging-bearer";
+  const productionBearer = "example-production-bearer-dummy-value";
+  const stagingBearer = "example-staging-bearer-dummy-value";
   const originalBearer = config.bearerToken;
   try {
     for (const { serviceName, acceptedBearer, rejectedBearer } of [

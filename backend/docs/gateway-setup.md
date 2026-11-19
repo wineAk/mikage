@@ -11,9 +11,24 @@ Render は `MIKAGE_GATEWAY_BASE_URL` の origin root に `/office/<アプリ名>
 | `/office/mikage/<source>` | `https://mikage.inter.dedyn.io/gw/<source>`（Production） |
 | `/office/mikage-staging/<source>` | `https://mikage-staging.inter.dedyn.io/gw/<source>`（Staging） |
 
-CaddyはBearerやheaderの値を使って転送先を選ばず、Mikage固有のsource/path allowlistも持ちません。APIが `/gw` 配下の公開route、method、Bearer認証を管理し、未定義のpathや誤methodは404にします。`/admin`、`/admin.js`、`/v1/admin/*` は `/gw` namespaceに公開しません。ProductionとStagingは同じ環境変数名 `MIKAGE_API_BEARER_TOKEN` を使いますが、値は別々に発行・設定し、他方のAPIでは401になるようにします。tokenの文字列形式や接頭辞にrouting上の意味はありません。
+CaddyはBearerやheaderの値を使って転送先を選ばず、Mikage固有のsource/path allowlistも持ちません。APIが `/gw` 配下の公開route、method、Bearer認証を管理し、未定義のpathや誤methodは404にします。`/admin`、`/admin.js`、`/v1/admin/*` は `/gw` namespaceに公開しません。ProductionとStagingは同じ環境変数名 `MIKAGE_API_BEARER_TOKEN` を使いますが、値は別々に発行・設定し、他方のAPIでは401になるようにします。APIの起動時にBearerが32文字以上であることを検証します。tokenの文字列形式や接頭辞にrouting上の意味はありません。
 
 Caddyfileの変更はClaudeが行います。アプリの変更に合わせてCaddy設定が必要になった場合は、Caddyfileを直接変更せず、Claudeへの作業依頼としてまとめます。VPS、Dokploy、Render、CloudFront、DNS、ACL、Firewall、NATの設定変更はこのアプリ作業に含めません。
+
+## Gatewayと管理画面のHost分離
+
+`MIKAGE_GATEWAY_ALLOWED_HOSTS` を設定すると、`/gw` 配下はこのカンマ区切りHost一覧に一致するときだけ受け付けます。Hostは大文字小文字を区別せず比較します。管理画面（`/admin`、`/admin.js`、`/v1/admin/*`）は引き続き `MIKAGE_ADMIN_ALLOWED_HOSTS` のHostだけを受け付けます。両方の一覧に同じHostがある場合はAPIの起動を拒否します。`/health` はどちらの一覧にも関係なく応答します。
+
+この分離は、Gateway経由のrequestが管理画面のHostへ到達しないようにする追加の保険です。`MIKAGE_GATEWAY_ALLOWED_HOSTS` が未設定の間はGateway requestのHostを検査せず、現在の挙動を維持します。管理画面はこれまでどおり `MIKAGE_ADMIN_ALLOWED_HOSTS` だけで制限します。
+
+有効化には、環境設定の担当者が次の作業を行います。値は環境設定へ直接登録し、文書やcommitには記録しません。
+
+1. DokployでAPI serviceにGateway専用ドメインを追加します。
+2. LAN DNSにそのドメインを登録します。
+3. CaddyのGateway upstreamがGateway専用Hostを渡すよう変更します。Caddyfileの変更はClaudeが行います。
+4. APIの `MIKAGE_GATEWAY_ALLOWED_HOSTS` にGateway Hostを、`MIKAGE_ADMIN_ALLOWED_HOSTS` に管理画面Hostを設定し、両方の一覧を分離します。
+
+CodexはDokploy、LAN DNS、Caddy、API環境変数の設定変更を行いません。この機能を有効にする作業は各設定の担当者が行います。
 
 ## Render環境変数
 

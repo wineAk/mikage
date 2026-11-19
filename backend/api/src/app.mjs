@@ -14,7 +14,7 @@ import { config } from "./config.mjs";
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
-  app.use(gatewayDispatchMiddleware);
+  app.use((request, response, next) => gatewayDispatchMiddleware(request, response, next, config.allowedGatewayHosts));
   app.use((request, response, next) => {
     if (isAdminRequestPath(request.path) && !isAllowedAdminHost(request.get("host"), config.allowedAdminHosts)) {
       response.status(404).json({ error: "見つかりません。" });

@@ -5,7 +5,7 @@ process.env.PGHOST ??= "127.0.0.1";
 process.env.PGUSER ??= "test";
 process.env.PGPASSWORD ??= "test";
 process.env.PGDATABASE ??= "test";
-process.env.MIKAGE_API_BEARER_TOKEN ??= "test-token";
+process.env.MIKAGE_API_BEARER_TOKEN ??= "test-health-bearer-token-dummy-value";
 process.env.MIKAGE_ADMIN_ALLOWED_HOSTS ??= "admin.example.test";
 
 const [{ createApp }, { pool }] = await Promise.all([
