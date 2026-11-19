@@ -6,14 +6,14 @@
 
 Supabase sourceとN094 Dokploy PostgreSQLを別々に読み取り、対象4表の件数だけを確認した。実行時刻が異なりsourceは稼働中のため、これは同一snapshot照合ではなく、本番移行の合格証跡にも使わない。
 
-| table | Supabase source | N094 destination | 差（destination - source） |
+| table | Supabase source | N094 Dokploy DB（service environment: production） | 差（destination - source） |
 | --- | ---: | ---: | ---: |
 | `targets` | 19 | 19 | 0 |
 | `logs` | 400,721 | 388,522 | -12,199 |
 | `incidents` | 1 | 1 | 0 |
 | `watch_target_states` | 19 | 19 | 0 |
 
-N094の`logs`件数がsourceより12,199件少ないことを確認した。残る3表で件数が一致しても内容一致を示さない。N094は旧staging snapshotのまま保持し、本番sourceの最終import先として再利用・初期化しない。本番切替では、別の空production移行先を用意し、writer停止後の同一時点でschema、全行、期間別件数、sequence、FKをrunbookのmigration verifierと独立集計で照合する。
+N094の`logs`件数がsourceより12,199件少ないことを確認した。残る3表で件数が一致しても内容一致を示さない。Dokploy上の対象Compose appは`production`環境に属し、読み取り確認時点でAPI、PostgreSQL、maintenance schedulerが稼働中だった。DBの`migration_state.data_verified`も`true`だったが、これは現時点のsourceとの同一snapshot照合や本番切替準備の完了を示さない。既存DBをstaging用と決めつけず、既存volumeを保持し、新しいimport先として再利用・初期化しない。staging rehearsalと本番切替には、それぞれ既存DBと分離した専用の空DB/volumeを用意する。writer停止後の本番importでは、同一時点のschema、全行、期間別件数、sequence、FKをrunbookのmigration verifierと独立集計で照合する。
 
 同日、Dokploy API healthとBearer付きGET、Render PR Previewからの認証付きView GETを確認済み。POST保存/read-back、通知failure injection、独立staging DB上の7日観察は未実施であり、本番切替の前提は満たしていない。
 
