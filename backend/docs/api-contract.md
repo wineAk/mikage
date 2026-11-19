@@ -132,7 +132,7 @@ UTC 分スロットの予約。有効 target を DB から取得し、`mikage.re
 
 このAPIは通知を送らない。Instatus/Google Chatの送信・interval判断はRenderに残す。Render PreviewのView GETは確認済みだが、Preview経由のincident POSTとread-back、通知後停止を含むfailure injectionは未確認。
 
-Render PR Preview（`IS_PULL_REQUEST=true`）では `MIKAGE_PREVIEW_WATCH_ENABLED=true`、`MIKAGE_PREVIEW_NOTIFICATION_MOCK=true`、`MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` が揃わない限りwatch routeを503で停止する。Previewのstaging prefixはCaddyでDokploy Staging APIだけに転送し、`MIKAGE_API_BEARER_TOKEN`もStaging API専用値にする。これによりwatchの予約・結果・incident writeはStaging DBへ向かう。CaddyのStaging routeを両VPSで検証するまではPreview watchを有効にしない。有効化後も本番のInstatus/Google Chat APIは呼ばない。`MIKAGE_PREVIEW_NOTIFICATION_MOCK=true` のときだけPreview専用mock通知（network I/Oなし、決定的な合成ID）で `notification_pending` → `update` 経路を検証できる。`MIKAGE_PREVIEW_NOTIFICATION_FAILURE_MODE` は `api_failure`（通知API失敗、DB更新前）と `after_notification_before_db`（mock送信後に503相当でabort、DB更新前）を取り、mock有効時のみ有効。通常Render serviceでは既存動作を維持する。
+Render PR Preview（`IS_PULL_REQUEST=true`）では `MIKAGE_PREVIEW_WATCH_ENABLED=true`、`MIKAGE_PREVIEW_NOTIFICATION_MOCK=true`、`MIKAGE_GATEWAY_APP=mikage-staging` が揃わない限りwatch routeを503で停止する。Caddyはpathで転送先を選び、Previewの `mikage-staging` appはDokploy Staging APIへ転送される。`MIKAGE_API_BEARER_TOKEN`はStaging API専用値にし、Production APIの値と分離する。これによりwatchの予約・結果・incident writeはStaging DBへ向かう。有効化後も本番のInstatus/Google Chat APIは呼ばない。`MIKAGE_PREVIEW_NOTIFICATION_MOCK=true` のときだけPreview専用mock通知（network I/Oなし、決定的な合成ID）で `notification_pending` → `update` 経路を検証できる。`MIKAGE_PREVIEW_NOTIFICATION_FAILURE_MODE` は `api_failure`（通知API失敗、DB更新前）と `after_notification_before_db`（mock送信後に503相当でabort、DB更新前）を取り、mock有効時のみ有効。通常Render serviceでは既存動作を維持する。
 
 ## View read API
 
@@ -162,7 +162,7 @@ HTTPS URL、資格情報/fragmentなし、完全一致target host allowlist、HT
 
 ## Gateway API
 
-Render serverは `MIKAGE_GATEWAY_BASE_URL` にGateway hostを設定し、`MIKAGE_API_BEARER_TOKEN` をAuthorization headerへ設定する。通常Render serviceでは `MIKAGE_GATEWAY_ROUTE_PREFIX` の既定値は `office/mikage` で、Staging prefixは拒否する。Render PR Preview（`IS_PULL_REQUEST=true`）ではView/monitoringを含むすべてのGateway読み書きが `MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` を明示するまでfail closedし、未設定時にProduction prefixへ既定フォールバックしない。PreviewでProduction prefixを明示しても拒否する。VPS Caddyの共通routeは対応するprefixを `/gw/` に置き換えて各環境のAPIへ転送する。Caddyで個別source/pathの許可一覧は持たず、APIが公開routeを限定する。`X-Origin-Verify` はCaddyからAPIへ転送しない。watch起動endpoint `/api/v1/watch` は別tokenを `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。
+Render serverは `MIKAGE_GATEWAY_BASE_URL` にorigin rootを、`MIKAGE_API_BEARER_TOKEN` をAuthorization headerへ設定する。`MIKAGE_GATEWAY_BASE_URL` にpath接頭辞は付けない。`MIKAGE_GATEWAY_APP` は `[a-z0-9-]+` の値を取り、未設定時は `mikage` を使う。PR Preview（`IS_PULL_REQUEST=true`）では `MIKAGE_GATEWAY_APP=mikage-staging` を明示するまで、View/monitoringを含むすべてのGateway読み書きをfail closedする。Productionの `/office/mikage/<source>` は `https://mikage.inter.dedyn.io/gw/<source>` へ、Previewの `/office/mikage-staging/<source>` は `https://mikage-staging.inter.dedyn.io/gw/<source>` へ転送する。Caddyはpathだけで転送先を決め、tokenやheaderで接続先を分岐しない。ProductionとStaging APIは `MIKAGE_API_BEARER_TOKEN` に別の値を設定し、値の接頭辞にrouting上の意味を持たせない。Caddyは個別source/pathの許可一覧を持たず、APIが公開routeを限定する。Caddyfileの変更はClaudeだけが行う。`X-Origin-Verify` はCaddyからAPIへ転送しない。Preview環境からProductionのSupabase接続値および実通知先のInstatus/Google Chat設定を削除し、Staging専用値を用意する。watch起動endpoint `/api/v1/watch` は別tokenを `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。
 
 | Render source | method | Gateway API path | 既存handler |
 |---|---|---|---|

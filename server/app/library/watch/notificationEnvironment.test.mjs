@@ -66,13 +66,13 @@ test("Render Previewの監視実行は明示的に有効化するまで停止す
     IS_PULL_REQUEST: "true",
     MIKAGE_PREVIEW_WATCH_ENABLED: "true",
     MIKAGE_PREVIEW_NOTIFICATION_MOCK: "true",
-    MIKAGE_GATEWAY_ROUTE_PREFIX: "office/mikage",
+    MIKAGE_GATEWAY_APP: "mikage",
   }), false);
   assert.equal(isWatchExecutionEnabled({
     IS_PULL_REQUEST: "true",
     MIKAGE_PREVIEW_WATCH_ENABLED: "true",
     MIKAGE_PREVIEW_NOTIFICATION_MOCK: "true",
-    MIKAGE_GATEWAY_ROUTE_PREFIX: "office/mikage-staging",
+    MIKAGE_GATEWAY_APP: "mikage-staging",
   }), true);
   assert.equal(isWatchExecutionEnabled({ IS_PULL_REQUEST: "false" }), true);
 });

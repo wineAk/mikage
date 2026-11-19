@@ -25,5 +25,5 @@ export function isWatchExecutionEnabled(environment) {
 
   return environment.MIKAGE_PREVIEW_WATCH_ENABLED === "true"
     && environment.MIKAGE_PREVIEW_NOTIFICATION_MOCK === "true"
-    && environment.MIKAGE_GATEWAY_ROUTE_PREFIX === "office/mikage-staging";
+    && environment.MIKAGE_GATEWAY_APP === "mikage-staging";
 }

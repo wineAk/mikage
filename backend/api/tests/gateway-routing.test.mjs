@@ -14,6 +14,7 @@ const [{ createApp }, { pool }, { gatewayRouteContracts }] = await Promise.all([
   import("../src/db.mjs"),
   import("../src/routes/gateway-contracts.mjs"),
 ]);
+const { config } = await import("../src/config.mjs");
 
 const originalPoolQuery = pool.query;
 let isMigrationVerified = true;
@@ -49,14 +50,14 @@ after(async () => {
   await pool.end();
 });
 
-function requestRaw(requestPath, { method = "GET", body, host = "admin.example.test" } = {}) {
+function requestRaw(requestPath, { method = "GET", body, host = "admin.example.test", headers = {} } = {}) {
   return new Promise((resolve, reject) => {
     const request = http.request({
       hostname: "127.0.0.1",
       port: server.address().port,
       method,
       path: requestPath,
-      headers: { Host: host, ...(body ? { "Content-Type": "application/json" } : {}) },
+      headers: { Host: host, ...(body ? { "Content-Type": "application/json" } : {}), ...headers },
     }, (response) => {
       const chunks = [];
       response.on("data", (chunk) => chunks.push(chunk));
@@ -89,6 +90,19 @@ test("未検証migration gateより前にGatewayの未認証requestを401で拒�
     assert.equal(response.status, 401);
   } finally {
     isMigrationVerified = true;
+  }
+});
+
+test("Production・Stagingのどちらでも未認証のGateway requestは401になる", async () => {
+  const originalBearer = config.bearerToken;
+  try {
+    for (const bearer of ["example-production-bearer", "example-staging-bearer"]) {
+      config.bearerToken = bearer;
+      const response = await requestRaw("/gw/view-targets");
+      assert.equal(response.status, 401);
+    }
+  } finally {
+    config.bearerToken = originalBearer;
   }
 });
 
@@ -128,24 +142,78 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
   });
 });
 
+test("ProductionとStagingのBearerを分離し、token文字列でrouteを選ばない", async () => {
+  const productionBearer = "example-production-bearer";
+  const stagingBearer = "example-staging-bearer";
+  const originalBearer = config.bearerToken;
+  try {
+    for (const { serviceName, acceptedBearer, rejectedBearer } of [
+      { serviceName: "Production", acceptedBearer: productionBearer, rejectedBearer: stagingBearer },
+      { serviceName: "Staging", acceptedBearer: stagingBearer, rejectedBearer: productionBearer },
+    ]) {
+      config.bearerToken = acceptedBearer;
+      const acceptedResponse = await requestRaw("/gw/view-targets", {
+        headers: { Authorization: `Bearer ${acceptedBearer}` },
+      });
+      assert.equal(acceptedResponse.status, 200, `${serviceName} must accept only its own bearer`);
+      const rejectedResponse = await requestRaw("/gw/view-targets", {
+        headers: { Authorization: `Bearer ${rejectedBearer}` },
+      });
+      assert.equal(rejectedResponse.status, 401, `${serviceName} must reject the other service bearer`);
+    }
+  } finally {
+    config.bearerToken = originalBearer;
+  }
+});
+
+test("Bearerは401応答にもerror logにも出さない", async () => {
+  const errorCalls = [];
+  const originalConsoleError = console.error;
+  const originalBearer = config.bearerToken;
+  console.error = (...arguments_) => errorCalls.push(arguments_.join(" "));
+  try {
+    for (const serviceBearer of ["example-production-bearer", "example-staging-bearer"]) {
+      const attemptedBearer = `${serviceBearer}-invalid`;
+      config.bearerToken = serviceBearer;
+      const response = await requestRaw("/gw/view-targets", {
+        headers: { Authorization: `Bearer ${attemptedBearer}` },
+      });
+      assert.equal(response.status, 401);
+      assert.equal(response.body.includes(attemptedBearer), false);
+      assert.equal(errorCalls.join(" ").includes(attemptedBearer), false);
+    }
+  } finally {
+    config.bearerToken = originalBearer;
+    console.error = originalConsoleError;
+  }
+});
+
 test("未定義Gateway pathと誤methodはmigration gateより先に404になる", async () => {
   isMigrationVerified = false;
+  const originalBearer = config.bearerToken;
   try {
-    for (const [method, requestPath] of [
-      ["GET", "/gw/unknown"],
-      ["POST", "/gw/view-targets"],
-      ["GET", "/gw/watch-results"],
-      ["GET", "/gw/admin"],
-      ["GET", "/gw/admin.js"],
-      ["GET", "/gw/v1/admin/targets"],
-      ["GET", "/gwharmless"],
-      ["GET", "/%67wharmless"],
-    ]) {
-      const response = await requestRaw(requestPath, { method });
-      assert.equal(response.status, 404, `${method} ${requestPath}`);
+    for (const bearer of ["example-production-bearer", "example-staging-bearer"]) {
+      config.bearerToken = bearer;
+      for (const [method, requestPath] of [
+        ["GET", "/gw/unknown"],
+        ["POST", "/gw/view-targets"],
+        ["GET", "/gw/watch-results"],
+        ["GET", "/gw/admin"],
+        ["GET", "/gw/admin.js"],
+        ["GET", "/gw/v1/admin/targets"],
+        ["GET", "/gwharmless"],
+        ["GET", "/%67wharmless"],
+        ["GET", "/gw/..%2fadmin"],
+        ["GET", "/gw/%2e%2e%2fadmin"],
+        ["GET", "/gw/%2e%2e%2fv1%2fadmin%2ftargets"],
+      ]) {
+        const response = await requestRaw(requestPath, { method });
+        assert.equal(response.status, 404, `${method} ${requestPath}`);
+      }
     }
   } finally {
     isMigrationVerified = true;
+    config.bearerToken = originalBearer;
   }
   assert.equal((await requestRaw("/%67w/view-targets")).status, 404);
 });
@@ -158,6 +226,10 @@ test("dot segmentとencoded dot segmentでGateway外のadmin routeへ到達し�
     "/gw/../admin",
     "/gw/%2e%2e/admin",
     "/gw/%2e%2e/v1/admin/targets",
+    "/gw/..%2fadmin",
+    "/gw/%2e%2e%2fadmin",
+    "/gw/%2e%2e%2fv1%2fadmin%2ftargets",
+    "/gw/%2e%2e/v1/admin/targets",
     "/%67w/%2e%2e/admin",
   ]) {
     const response = await requestRaw(requestPath);
@@ -166,13 +238,21 @@ test("dot segmentとencoded dot segmentでGateway外のadmin routeへ到達し�
 });
 
 test("Gateway POST bodyは1MBを超えると413になる", async () => {
-  const response = await fetch(`${baseUrl}/gw/watch-results`, {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer test-token",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ payload: "x".repeat(1024 * 1024) }),
-  });
-  assert.equal(response.status, 413);
+  const originalBearer = config.bearerToken;
+  try {
+    for (const bearer of ["example-production-bearer", "example-staging-bearer"]) {
+      config.bearerToken = bearer;
+      const response = await fetch(`${baseUrl}/gw/watch-results`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${bearer}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ payload: "x".repeat(1024 * 1024) }),
+      });
+      assert.equal(response.status, 413);
+    }
+  } finally {
+    config.bearerToken = originalBearer;
+  }
 });

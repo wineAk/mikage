@@ -12,27 +12,24 @@ const GATEWAY_SOURCES = [
   "view-target-proxy",
 ] as const;
 
-const DEFAULT_GATEWAY_ROUTE_PREFIX = "office/mikage";
-const STAGING_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
-const ALLOWED_GATEWAY_ROUTE_PREFIXES = new Set([
-  DEFAULT_GATEWAY_ROUTE_PREFIX,
-  STAGING_GATEWAY_ROUTE_PREFIX,
-]);
+const DEFAULT_GATEWAY_APP = "mikage";
+const STAGING_GATEWAY_APP = "mikage-staging";
+const GATEWAY_APP_PATTERN = /^[a-z0-9-]+$/;
 
-function resolveGatewayRoutePrefix(): string {
+export function resolveMikageGatewayApp(): string {
   const isPullRequest = process.env.IS_PULL_REQUEST === "true";
-  const configuredPrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  const configuredApp = process.env.MIKAGE_GATEWAY_APP;
   if (isPullRequest) {
-    if (configuredPrefix !== STAGING_GATEWAY_ROUTE_PREFIX) {
+    if (configuredApp !== STAGING_GATEWAY_APP) {
       throw new Error("ミカゲAPI Gatewayの設定が不正です。");
     }
-    return STAGING_GATEWAY_ROUTE_PREFIX;
+    return STAGING_GATEWAY_APP;
   }
-  const routePrefix = configuredPrefix ?? DEFAULT_GATEWAY_ROUTE_PREFIX;
-  if (routePrefix === STAGING_GATEWAY_ROUTE_PREFIX || !ALLOWED_GATEWAY_ROUTE_PREFIXES.has(routePrefix)) {
+  const gatewayApp = configuredApp ?? DEFAULT_GATEWAY_APP;
+  if (!GATEWAY_APP_PATTERN.test(gatewayApp) || gatewayApp === STAGING_GATEWAY_APP) {
     throw new Error("ミカゲAPI Gatewayの設定が不正です。");
   }
-  return routePrefix;
+  return gatewayApp;
 }
 
 export type MikageGatewaySource = typeof GATEWAY_SOURCES[number];
@@ -50,11 +47,11 @@ function getGatewayConfig() {
     && parsed.pathname === "/"
     && !parsed.search
     && !parsed.hash;
-  const routePrefix = resolveGatewayRoutePrefix();
+  const gatewayApp = resolveMikageGatewayApp();
   if (!hasValidGatewayUrl) {
     throw new Error("ミカゲAPI Gatewayの設定が不正です。");
   }
-  return { baseUrl, routePrefix, token };
+  return { baseUrl, gatewayApp, token };
 }
 
 export async function fetchMikageApi<T>(
@@ -64,8 +61,8 @@ export async function fetchMikageApi<T>(
   if (!GATEWAY_SOURCES.includes(source)) {
     throw new Error("未許可のミカゲAPI Gateway sourceです。");
   }
-  const { baseUrl, routePrefix, token } = getGatewayConfig();
-  const url = new URL(`${baseUrl}/${routePrefix}/${source}`);
+  const { baseUrl, gatewayApp, token } = getGatewayConfig();
+  const url = new URL(`${baseUrl}/office/${gatewayApp}/${source}`);
   if (options.query) url.search = options.query.toString();
   const timeoutSignal = AbortSignal.timeout(10_000);
   const signal = options.signal ? AbortSignal.any([options.signal, timeoutSignal]) : timeoutSignal;
@@ -87,5 +84,11 @@ export async function fetchMikageApi<T>(
 }
 
 export function isMikageGatewayConfigured(): boolean {
-  return Boolean(process.env.MIKAGE_GATEWAY_BASE_URL && process.env.MIKAGE_API_BEARER_TOKEN);
+  if (!process.env.MIKAGE_GATEWAY_BASE_URL || !process.env.MIKAGE_API_BEARER_TOKEN) return false;
+  try {
+    resolveMikageGatewayApp();
+    return true;
+  } catch {
+    return false;
+  }
 }

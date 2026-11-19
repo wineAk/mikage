@@ -1,5 +1,9 @@
 import { createHash } from "node:crypto";
-import { fetchMikageApi, isMikageGatewayConfigured } from "./mikageApi.server";
+import {
+  fetchMikageApi,
+  isMikageGatewayConfigured,
+  resolveMikageGatewayApp,
+} from "./mikageApi.server";
 
 const sessionCookiePattern = /^sb-.*-auth-token(?:-code-verifier)?(?:\.\d+)?$/;
 
@@ -21,10 +25,16 @@ export function isPageCacheEligible(request: Request): boolean {
 export function getPageCacheScope(request: Request): string | null {
   if (!isPageCacheEligible(request)) return null;
   if (!isMikageGatewayConfigured()) return null;
+  let gatewayApp: string;
+  try {
+    gatewayApp = resolveMikageGatewayApp();
+  } catch {
+    return null;
+  }
   // 認証値やCookieをキーへ直接保存せず、プロジェクトと利用者の境界を分ける。
   return createHash("sha256").update(JSON.stringify([
     process.env.MIKAGE_GATEWAY_BASE_URL ?? "",
-    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX ?? "office/mikage",
+    gatewayApp,
     process.env.MIKAGE_API_BEARER_TOKEN ?? "",
     "mikage",
     "anonymous",
