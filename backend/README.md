@@ -2,7 +2,7 @@
 
 Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQL、schema migration、API、maintenance schedulerをdeploy済みで、watch schedulerは専用 `watch` profileで隔離している。N094には過去のSupabase staging snapshotをimport・検証済みだが、現在のsource件数とは一致しないため本番データとして扱わない。2026-11-19に保存済みAPI環境変数を反映するためMikage Compose serviceを手動deployし、API healthとコンテナ内Bearer付き `GET /v1/view/targets` が200になることを確認した。Render PR Preview commit `3924bdf` からの `GET /api/v1/targets` は200で19件を返し、`/`、`/incidents`、`/errors` も200だった。Render経由POSTの保存/read-back、通知failure injection、CloudFrontのcache/query/logging設定は未確認。本番sourceの最終import、Render/GAS/Supabase cronの切替、watch scheduler有効化は未完了。
 
-Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後もInstatusとGoogle Chatへの作成・更新・解決通知を抑止する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
+Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後も本番のInstatus/Google Chat APIは呼ばない。staging受入では `MIKAGE_PREVIEW_NOTIFICATION_MOCK=true` で決定的な合成IDを返すmock通知を使い、`MIKAGE_PREVIEW_NOTIFICATION_FAILURE_MODE=api_failure` または `after_notification_before_db` でpending再送のfailure injectionを行える。mock/failure injectionを有効にしないPreviewでは従来どおり外部通知なしでDBだけ更新する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
 
 ## 含まれるもの
 

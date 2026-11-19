@@ -1,4 +1,11 @@
 import { parseSuccessfulNotificationResponse } from "./notificationResponse.mjs";
+import { areExternalNotificationsEnabled } from "./notificationEnvironment.mjs";
+
+function assertRealInstatusNetworkAllowed() {
+  if (!areExternalNotificationsEnabled(process.env)) {
+    throw new Error("Instatus notifications are disabled in this environment.");
+  }
+}
 
 const instatusURI = "https://api.instatus.com";
 const INSTATUS_API_KEY = process.env.VITE_INSTATUS_API_KEY;
@@ -18,6 +25,7 @@ type InstatusResponse = {
 
 // Instatus APIリクエスト送信
 async function sendInstatusRequest(url: string, body: any) {
+  assertRealInstatusNetworkAllowed();
   const res = await fetch(url, {
     method: "POST",
     headers,

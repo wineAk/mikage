@@ -9,8 +9,17 @@ import {
 import { getWatchSchedule } from "~/library/watch/schedule";
 import { checkTarget } from "~/library/watch/checkTarget";
 import { isAuthorizedWatchExecuteRequest } from "~/library/watch/executeAuth.mjs";
-import { areExternalNotificationsEnabled, isWatchExecutionEnabled } from "~/library/watch/notificationEnvironment.mjs";
+import {
+  areExternalNotificationsEnabled,
+  isPreviewNotificationMockEnabled,
+  isWatchExecutionEnabled,
+} from "~/library/watch/notificationEnvironment.mjs";
 import { isIncidentNotificationDue } from "~/library/watch/incidentNotificationPolicy.mjs";
+import {
+  deliverActiveIncidentNotifications,
+  deliverResolvedIncidentNotifications,
+} from "~/library/watch/incidentNotificationDelivery.mjs";
+import { PreviewNotificationAbortError } from "~/library/watch/previewNotification.mjs";
 import { parseWatchSlot } from "~/library/watch/watchSlot.mjs";
 import {
   createIncidentInstatus,
@@ -130,6 +139,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   try {
     const externalNotificationsEnabled = areExternalNotificationsEnabled(process.env);
+    const previewNotificationMockEnabled = isPreviewNotificationMockEnabled(process.env);
+    const incidentNotificationsEnabled = externalNotificationsEnabled || previewNotificationMockEnabled;
+    const instatusClients = {
+      createIncident: createIncidentInstatus,
+      updateIncident: updateIncidentInstatus,
+      resolveIncident: resolveIncidentInstatus,
+    };
+    const googleChatClients = {
+      createThread: createThreadGoogleChat,
+      updateThread: updateThreadGoogleChat,
+      resolveThread: resolveThreadGoogleChat,
+    };
     const reservation = await fetchMikageApi<{
       selected_target_keys: string[];
       selected_target_names: Record<string, string>;
@@ -297,45 +318,20 @@ export async function loader({ request }: Route.LoaderArgs) {
         }
 
         const errorCount = isNewIncident ? Number(incident.count) : Number(incident.count) + 1;
-        let instatusId = incident.instatus_id;
-        let googleChatName = incident.googlechat_name;
-        let instatusUrl: string | null = null;
-
-        if (externalNotificationsEnabled && pageId && component) {
-          if (!instatusId) {
-            const instatusResult = await createIncidentInstatus({
-              started: new Date(incident.created_at).toISOString(),
-              page_id: pageId,
-              components: [component],
-              serviceName,
-            });
-            instatusId = instatusResult?.incident?.id ?? instatusResult?.id ?? null;
-          } else {
-            const instatusResult = await updateIncidentInstatus(instatusId, {
-              started: now.toISOString(),
-              page_id: pageId,
-              components: [component],
-            });
-            instatusId = instatusResult?.incident?.id ?? instatusResult?.id ?? instatusId;
-          }
-        }
-
-        if (instatusId) {
-          const subDomain = label === "works" ? "works" : "saaske";
-          instatusUrl = `https://${subDomain}.instatus.com/${instatusId}`;
-        }
-
-        if (externalNotificationsEnabled) {
-          if (!googleChatName) {
-            const googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
-            googleChatName = googleChatResult?.thread?.name ?? null;
-            if (googleChatName) {
-              await updateThreadGoogleChat(errors, googleChatName);
-            }
-          } else {
-            await updateThreadGoogleChat(errors, googleChatName);
-          }
-        }
+        const delivery = await deliverActiveIncidentNotifications({
+          environment: process.env,
+          label,
+          errors,
+          incident,
+          pageId,
+          component,
+          serviceName,
+          now,
+          instatusClients,
+          googleChatClients,
+        });
+        const instatusId = delivery.instatusId;
+        const googleChatName = delivery.googleChatName;
 
         await fetchMikageApi("watch-incidents", {
           method: "POST",
@@ -352,23 +348,25 @@ export async function loader({ request }: Route.LoaderArgs) {
           signal: request.signal,
         });
 
-        if (!externalNotificationsEnabled) {
+        if (!incidentNotificationsEnabled) {
           return { status: "recorded_without_notifications" };
+        }
+        if (previewNotificationMockEnabled) {
+          return { status: isNewIncident ? "preview_mock_notified" : "preview_mock_updated" };
         }
         return { status: isNewIncident ? "notified" : "updated" };
       }
 
       if (errors.length === 0 && incident) {
-        if (externalNotificationsEnabled && incident.googlechat_name) {
-          await resolveThreadGoogleChat([], incident.googlechat_name);
-        }
-        if (externalNotificationsEnabled && incident.instatus_id && pageId && component) {
-          await resolveIncidentInstatus(incident.instatus_id, {
-            started: now.toISOString(),
-            page_id: pageId,
-            components: [component],
-          });
-        }
+        await deliverResolvedIncidentNotifications({
+          environment: process.env,
+          incident,
+          pageId,
+          component,
+          now,
+          instatusClients,
+          googleChatClients,
+        });
 
         await fetchMikageApi("watch-incidents", {
           method: "POST",
@@ -439,6 +437,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     });
 
   } catch (error) {
+    if (error instanceof PreviewNotificationAbortError) {
+      console.error("監視処理に失敗しました。", error.name);
+      return jsonResponse({ error: "監視処理に失敗しました。" }, 503);
+    }
     console.error(
       "監視処理に失敗しました。",
       error instanceof Error ? error.name : "UnknownError"

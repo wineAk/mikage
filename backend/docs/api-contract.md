@@ -132,7 +132,7 @@ UTC 分スロットの予約。有効 target を DB から取得し、`mikage.re
 
 このAPIは通知を送らない。Instatus/Google Chatの送信・interval判断はRenderに残す。Render PreviewのView GETは確認済みだが、Preview経由のincident POSTとread-back、通知後停止を含むfailure injectionは未確認。
 
-Render PR Preview（`IS_PULL_REQUEST=true`）では`MIKAGE_PREVIEW_WATCH_ENABLED=true`がない限りwatch routeを503で停止する。有効化後もInstatus/Google Chatへの外部通知を抑止し、監視結果とincident stateだけをDokploy APIへ保存する。Preview環境のDB接続先をstaging DBに設定してからwatchを有効にする。通常Render serviceでは既存動作を維持する。
+Render PR Preview（`IS_PULL_REQUEST=true`）では`MIKAGE_PREVIEW_WATCH_ENABLED=true`がない限りwatch routeを503で停止する。有効化後も本番のInstatus/Google Chat APIは呼ばない。`MIKAGE_PREVIEW_NOTIFICATION_MOCK=true` のときだけPreview専用mock通知（network I/Oなし、決定的な合成ID）で `notification_pending` → `update` 経路を検証できる。`MIKAGE_PREVIEW_NOTIFICATION_FAILURE_MODE` は `api_failure`（通知API失敗、DB更新前）と `after_notification_before_db`（mock送信後に503相当でabort、DB更新前）を取り、mock有効時のみ有効。mockを有効にしないPreviewでは従来どおり外部通知なしでincident stateだけ保存する。Preview環境のDB接続先をstaging DBに設定してからwatchを有効にする。通常Render serviceでは既存動作を維持する。
 
 ## View read API
 
