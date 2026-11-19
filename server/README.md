@@ -106,7 +106,7 @@ WATCH_REDUCED_POLLING_PERIODS=2026-12-28/2027-01-04,2027-08-10/2027-08-13
 
 ### Dokploy API Gateway（移行ブランチ）
 
-View/monitoring APIは `MIKAGE_GATEWAY_BASE_URL` と `MIKAGE_API_BEARER_TOKEN` を使い、Render serverからVPS Gateway経由でDokploy上のMikage APIを呼ぶ。watch起動は別の `MIKAGE_WATCH_EXECUTE_TOKEN` で保護し、schedulerからRenderへ渡す。両tokenはserver-only環境変数とし、`VITE_`を付けない。Caddy route fragmentは `watch-targets`, `watch-reservations`, `watch-results`, `watch-state`, `watch-incidents` と `view-targets`, `view-target-proxy`, `view-logs`, `view-errors`, `view-incidents`, `view-revision` を各API endpointへrewriteする。Caddy fragmentはリポジトリに準備済みだが、VPSには未配置。Render側の置換はfeature branchのみで、環境変数や本番設定は変更していない。GASの既存query-key triggerはfeature branchと互換がないため、本番切替のscheduler起動元変更と同時に停止する。
+View/monitoring APIは `MIKAGE_GATEWAY_BASE_URL` と `MIKAGE_API_BEARER_TOKEN` を使い、Render serverからVPS Gateway経由でDokploy上のMikage APIを呼ぶ。watch起動は別の `MIKAGE_WATCH_EXECUTE_TOKEN` で保護し、schedulerからRenderへ渡す。両tokenはserver-only環境変数とし、`VITE_`を付けない。Render clientはsource名を `/office/mikage/<source>` に付け、VPS Caddyの共通routeが `/gw/<source>` に置換して `https://mikage.inter.dedyn.io` へ転送する。Caddyは個別source/path allowlistを持たず、APIの `/gw` routeが公開operationを限定する。`/gw` 対応branchはDokployへdeploy済みで、Caddyの共通routeもVPSへ反映済み。2026-11-19にN094 APIの認証付きView GETが200、Render PR Previewの `GET /api/v1/targets` が200で19件、ホーム・インシデント・エラーページも200になることを確認した。POST保存/read-back、Preview watchの失敗注入と通知抑止、CloudFront policy/cache/logging/query forwardingは未確認。GASの既存query-key triggerはfeature branchと互換がないため、本番切替のscheduler起動元変更と同時に停止する。
 
 ### ロールバック
 

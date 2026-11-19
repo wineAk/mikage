@@ -1,6 +1,6 @@
 # 監視 API 契約（実装中）
 
-本ドキュメントは専用 Compose app 内のAPI endpointを記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。N094のDokployには旧Supabase staging snapshotをimport・検証済みで、現在のAPI、PostgreSQL、maintenance schedulerは稼働中。`/gw` routeを含むbranchもdeploy済み。公開Gatewayの未認証GETは401、未知pathは404を返すことを確認した。Bearer付きRender経由GET/POSTの実保存、CloudFront policy/cache/logging、通知運用、本番sourceの最終データ移行とscheduler切替は未確認・未完了。
+本ドキュメントは専用 Compose app 内のAPI endpointを記述する。Render View readsとwatch routeはGateway API clientへ切替済みで、watch/maintenance schedulerもCompose serviceとして実装済み。N094のDokployには旧Supabase staging snapshotをimport・検証済みで、現在のAPI、PostgreSQL、maintenance schedulerは稼働中。`/gw` routeを含むbranchもdeploy済み。2026-11-19にN094 API healthとBearer付きGET、Render PR Previewからの `GET /api/v1/targets`（19件）および主要View page GETが200になることを確認した。POSTの実保存/read-back、CloudFront policy/cache/logging、通知運用、本番sourceの最終データ移行とscheduler切替は未確認・未完了。
 
 ## 認証
 
@@ -121,7 +121,7 @@ UTC 分スロットの予約。有効 target を DB から取得し、`mikage.re
 - shape、型、件数不正: `400`
 
 
-`results` は予約slotのtarget全件を一意に含める。輪番では予約済み1件、full-runでは全有効targetを含め、部分POSTは拒否する。APIはログからwatch failure state（初回失敗、5分経過後の確認、成功時のクリア）を計算し、Renderからのstate値を受け取らない。ログの `response_time` はinteger列に合わせて四捨五入する。最大件数は `MAX_TARGET_KEYS`（既定値500）。このendpointはincident通知/保存を行わない。障害通知は引き続きRenderが担当し、incident DB遷移は `POST /v1/watch/incidents` を使う。Render routeはAPI clientへ切替済み、実Gateway/private hopは未検証。
+`results` は予約slotのtarget全件を一意に含める。輪番では予約済み1件、full-runでは全有効targetを含め、部分POSTは拒否する。APIはログからwatch failure state（初回失敗、5分経過後の確認、成功時のクリア）を計算し、Renderからのstate値を受け取らない。ログの `response_time` はinteger列に合わせて四捨五入する。最大件数は `MAX_TARGET_KEYS`（既定値500）。このendpointはincident通知/保存を行わない。障害通知は引き続きRenderが担当し、incident DB遷移は `POST /v1/watch/incidents` を使う。Render Previewの `GET /api/v1/targets` と主要View pageは200を確認済み。`POST /v1/watch/results` のRender経由保存/read-backは未確認。
 
 ## Incident state API
 
@@ -130,7 +130,7 @@ UTC 分スロットの予約。有効 target を DB から取得し、`mikage.re
 - request_idとcanonical request hashをDB保存する。同じIDと同じbodyは200 duplicateで元incident_idを返し、異なるbodyは409。
 - openは同じkeywordの未解決incidentがあれば409。update/closeは指定id/keywordの未解決incidentだけを更新する。DB更新と冪等性recordは同じtransaction。
 
-このAPIは通知を送らない。Instatus/Google Chatの送信・interval判断はRenderに残す。Render routeはAPI clientへ切替済みだが、実Gateway接続は未検証。
+このAPIは通知を送らない。Instatus/Google Chatの送信・interval判断はRenderに残す。Render PreviewのView GETは確認済みだが、Preview経由のincident POSTとread-back、通知後停止を含むfailure injectionは未確認。
 
 Render PR Preview（`IS_PULL_REQUEST=true`）では`MIKAGE_PREVIEW_WATCH_ENABLED=true`がない限りwatch routeを503で停止する。有効化後もInstatus/Google Chatへの外部通知を抑止し、監視結果とincident stateだけをDokploy APIへ保存する。Preview環境のDB接続先をstaging DBに設定してからwatchを有効にする。通常Render serviceでは既存動作を維持する。
 
@@ -145,7 +145,7 @@ Render PR Preview（`IS_PULL_REQUEST=true`）では`MIKAGE_PREVIEW_WATCH_ENABLED
 - `GET /v1/view/incidents?offset=<0..120>` → `{ "data": [...] }`。JST月範囲、created_at昇順。
 - `GET /v1/view/revision` → `{ "revision": "<epoch>:<revision>" }`。PostgreSQL起動時刻と変更counterを使い、logs/targets/incidents更新で変化する。
 
-View read endpointsのSQL/API testsは専用PostgreSQL 17のfresh clusterで検証した。Render loader/actionとの同一データ比較と実Gateway通信は未実施。
+View read endpointsのSQL/API testsは専用PostgreSQL 17のfresh clusterで検証した。2026-11-19にRender Previewの `GET /api/v1/targets` は200で19件を返し、`/`、`/incidents`、`/errors` も200でloader error表示がないことを確認した。Render表示データとSupabase現行データの全件同一性、query付きlogs GET、POST保存/read-backは未確認。
 
 ## Target管理画面/API
 
@@ -180,11 +180,11 @@ Render serverは `MIKAGE_GATEWAY_BASE_URL` に `https://gw.inter.dedyn.io` を�
 
 APIは `/gw` の上記method/pathを既存handlerへ内部dispatchし、既存の認証・validation・DB処理を再利用する。query stringとrequest bodyを保持する。未認証は401、未定義pathと誤methodは404。JSON request bodyは1 MBを上限とする。dot segmentとpercent-encoded dot segmentを含むGateway pathは404となり、Gateway namespace外へdispatchしない。管理routeは `/gw` route tableへ登録せず、`/admin`、`/admin.js`、`/v1/admin/*` は公開Gatewayから利用できない。
 
-現行feature branchはDokployへdeploy済みで、Caddyの共通routeも反映済みとのユーザー報告がある。公開Gatewayではhealth 200、未認証の既知route 401、未知routeと管理path 404を外形確認した。Bearer付きRender経由GET/POSTのread-back、CloudFrontのAuthorization/query/cache/logging設定、N094のLAN外ingress境界は未検証。本番sourceの最終dump/import/sequence reconciliation、GAS・Supabase cron・watch schedulerの切替、staging観察期間も未完了。N094にあるimport済みデータは旧staging snapshotであり、本番sourceの現在値ではない。
+現行feature branchはDokployへdeploy済みで、Caddyの共通routeも反映済みとのユーザー報告がある。公開Gatewayではhealth 200、未認証の既知route 401、未知routeと管理path 404を外形確認した。2026-11-19にRender Previewから認証付きView GETが200になることを確認したが、POST保存/read-back、CloudFrontのAuthorization/query/cache/logging設定、N094のLAN外ingress境界は未検証。本番sourceの最終dump/import/sequence reconciliation、GAS・Supabase cron・watch schedulerの切替、staging観察期間も未完了。N094にあるimport済みデータは旧staging snapshotであり、本番sourceの現在値ではない。
 
 Compose `watch-scheduler` is isolated by the `watch` profile; the local override does not control whether the service is included. Enable the profile only after the GAS/Render cutover is approved, and set `WATCH_SCHEDULER_ENABLED=true` plus its Render URL/token in the Dokploy service environment. It calls Render `/api/v1/watch` every minute using a Bearer header and has no database credentials or network access. `maintenance-scheduler` starts with the default Compose services, uses its dedicated role to prune logs/incidents at JST month start 03:00 according to event time, and idempotency batches according to `saved_at`; it reindexes logs/incidents concurrently at 03:05/03:07. Each maintenance job checks the migration verification gate before running. Scheduler state is stored in service-specific named volumes. Watch health becomes degraded after three minutes without success; maintenance health becomes degraded 15 minutes after a scheduled job remains unsuccessful. Missed work does not catch up after a restart. Dokploy health alert routing and notification destinations remain unconfigured.
 
-Earlier PostgreSQL 17.11 verification on 2026-11-17: fresh DB applied migrations 001–014; API PostgreSQL integration tests passed 27/27; scheduler/maintenance integration tests passed 19/19; migration verifier/Gateway contract tests passed 35/35. In the later DB-free run, API tests passed 5 cases with 23 database integration cases skipped, scheduler tests passed 17 with 2 DB cases skipped, migration verifier/Gateway tests passed 17/17, and Render watch/Gateway focused tests were run separately. Docker Compose service startup/health and the real network path remain unverified because the Docker engine and staging environment were unavailable.
+Earlier PostgreSQL 17.11 verification on 2026-11-17: fresh DB applied migrations 001–014; API PostgreSQL integration tests passed 27/27; scheduler/maintenance integration tests passed 19/19; migration verifier/Gateway contract tests passed 35/35. In the later DB-free run, API tests passed 5 cases with 23 database integration cases skipped, scheduler tests passed 17 with 2 DB cases skipped, migration verifier/Gateway tests passed 17/17, and Render watch/Gateway focused tests were run separately. Those automated runs did not validate Compose startup or the live network path. On 2026-11-19, N094 API/DB/scheduler health and Render Preview View GETs were verified against the deployed service. Render Preview POST/read-back, watch failure injection, CloudFront policies and the full seven-day staging observation remain unverified.
 
 Incident schema parity verification on 2026-11-18: an isolated PostgreSQL 17 cluster applied migrations 001–015 and returned the expected `information_schema.columns.column_default` expressions for `incidents.keyword` and `incidents.count`; the temporary cluster was removed. N094 has migration 015 applied. Its read-only preflight found matching shared column attributes/defaults but a different physical order for `incidents.googlechat_name` and `instatus_id`. A separate read-only `information_schema.columns` check on N094 confirmed destination definitions `targets.is_enabled` = boolean / NOT NULL / default `true` / not identity, and `incidents.notification_pending` = boolean / NOT NULL / default `false` / not identity; the Supabase schema query returned neither destination-only column. The comparator now sorts contract columns by name, checks shared column attributes strictly, validates those destination-only definitions against their migrations, and compares `targets.is_enabled` when present in the source.
 

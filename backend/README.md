@@ -1,6 +1,6 @@
 # Mikage 専用 PostgreSQL / 監視 API
 
-Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQL、schema migration、API、maintenance schedulerをdeploy済みで、watch schedulerは専用 `watch` profileで隔離している。N094には過去のSupabase staging snapshotをimport・検証済みだが、現在のsource件数とは一致しないため本番データとして扱わない。Gateway用API `/gw` routeを含むbranchはDokployへdeploy済み。公開Gatewayでは未認証GETが401、未知routeが404を返すことを確認したが、Bearer付きGET/POSTのRender経由実通信とCloudFrontのcache/query/logging設定は未確認。本番sourceの最終import、Render/GAS/Supabase cronの切替、watch scheduler有効化は未完了。
+Render / Supabase / GAS の本番切替はまだ行っていない。Dokploy専用Compose appにはPostgreSQL、schema migration、API、maintenance schedulerをdeploy済みで、watch schedulerは専用 `watch` profileで隔離している。N094には過去のSupabase staging snapshotをimport・検証済みだが、現在のsource件数とは一致しないため本番データとして扱わない。2026-11-19に保存済みAPI環境変数を反映するためMikage Compose serviceを手動deployし、API healthとコンテナ内Bearer付き `GET /v1/view/targets` が200になることを確認した。Render PR Preview commit `3924bdf` からの `GET /api/v1/targets` は200で19件を返し、`/`、`/incidents`、`/errors` も200だった。Render経由POSTの保存/read-back、通知failure injection、CloudFrontのcache/query/logging設定は未確認。本番sourceの最終import、Render/GAS/Supabase cronの切替、watch scheduler有効化は未完了。
 
 Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WATCH_ENABLED=true` をPreview環境に明示するまでwatch実行を503で停止する。有効化後もInstatusとGoogle Chatへの作成・更新・解決通知を抑止する。Previewを使う際はRenderのPreview環境変数で本番DB以外の接続先を設定してからwatchを有効にする。通常Render serviceではwatchと外部通知を継続する。
 
@@ -130,4 +130,4 @@ Render source allowlist、API `/gw` method/path、既存API endpointへのdispat
 
 ## Caddy / Gateway の現在状態
 
-Render → CloudFront (`gw.inter.dedyn.io`) → RackNerd/GreenCloud Caddy → subnet route → N094 API の経路です。Caddyは共通routeで `/office/mikage/*` を `/gw/*` へ転送し、API側に11個の公開routeを実装しています。このbranchのAPI変更はDokploy未deployのため、現行Gateway実通信は未確認です。CloudFront policy/cache/loggingの実設定、query forwarding、POST保存/read-back、通知failure injection、production migration/cutoverも未完了です。詳細は [gateway-setup.md](./docs/gateway-setup.md) と [api-contract.md](./docs/api-contract.md) を参照。
+Render → CloudFront (`gw.inter.dedyn.io`) → RackNerd/GreenCloud Caddy → subnet route → N094 API の経路です。Caddyは共通routeで `/office/mikage/*` を `/gw/*` へ転送し、API側に11個の公開routeを実装しています。`/gw` 対応branchはDokployへdeploy済みで、両VPSのCaddyにも共通routeが反映済みです。2026-11-19にRender PR Preview経由の認証付き `GET /api/v1/targets` が200（19件）、ホーム・インシデント・エラーページが200になることを確認しました。POST保存/read-back、通知failure injection、CloudFront policy/cache/logging/query forwarding、production migration/cutoverは未完了です。Render Previewには旧Supabase関連環境変数が残っているため、移行前に用途と削除可否を整理します。詳細は [gateway-setup.md](./docs/gateway-setup.md) と [api-contract.md](./docs/api-contract.md) を参照。

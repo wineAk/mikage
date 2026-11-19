@@ -49,4 +49,4 @@ cd backend/api
 npm test
 ```
 
-CloudFront/Dokploy/VPSの設定、TLS経路、Bearer付き実通信、POST保存/read-back、LAN/WAN到達境界はコードテストだけでは検証できません。環境設定の変更は行わず、読み取り認証または安全なstaging環境が利用できる場合に個別確認します。
+2026-11-19の実環境確認では、N094 API healthとBearer付きGETが200、Render PR Previewの `GET /api/v1/targets` が200（19件）、`/`・`/incidents`・`/errors` が200になった。Render経由のPOST保存/read-back、CloudFrontのAuthorization/query/cache/logging設定、LAN/WAN到達境界は未確認であり、コードテストやGETの成功だけでは証明できない。
