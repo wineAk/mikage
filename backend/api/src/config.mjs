@@ -18,9 +18,12 @@ if (bearerToken.length < 32) {
 
 const allowedAdminHosts = parseAllowedHosts(required("MIKAGE_ADMIN_ALLOWED_HOSTS"));
 const configuredGatewayHosts = process.env.MIKAGE_GATEWAY_ALLOWED_HOSTS;
-const allowedGatewayHosts = configuredGatewayHosts === undefined
-  ? null
-  : parseAllowedHosts(configuredGatewayHosts);
+export const parseGatewayAllowedHosts = (value) => {
+  const hosts = parseAllowedHosts(value);
+  return hosts.size > 0 ? hosts : null;
+};
+
+const allowedGatewayHosts = parseGatewayAllowedHosts(configuredGatewayHosts);
 
 if (allowedGatewayHosts && [...allowedGatewayHosts].some((host) => allowedAdminHosts.has(host))) {
   throw new Error("MIKAGE_GATEWAY_ALLOWED_HOSTS と MIKAGE_ADMIN_ALLOWED_HOSTS に同じHostは設定できません。");

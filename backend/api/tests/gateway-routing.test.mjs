@@ -15,7 +15,7 @@ const [{ createApp }, { pool }, { gatewayRouteContracts }] = await Promise.all([
   import("../src/db.mjs"),
   import("../src/routes/gateway-contracts.mjs"),
 ]);
-const { config } = await import("../src/config.mjs");
+const { config, parseGatewayAllowedHosts } = await import("../src/config.mjs");
 
 const originalPoolQuery = pool.query;
 let isMigrationVerified = true;
@@ -146,13 +146,21 @@ test("認証済みGateway requestは既存endpointの処理とqueryを再利用�
   });
 });
 
-test("Gateway Host未設定時はHostを判定せず、現在の挙動を維持する", async () => {
-  assert.equal(config.allowedGatewayHosts, null);
-  const response = await requestRaw("/gw/view-targets", {
-    host: "unlisted.example.test",
-    headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
-  });
-  assert.equal(response.status, 200);
+test("Gateway Hostが未設定・空・空白・区切りだけならHostを判定しない", async () => {
+  const originalHosts = config.allowedGatewayHosts;
+  try {
+    for (const configuredHosts of [undefined, "", " \t ", ","]) {
+      config.allowedGatewayHosts = parseGatewayAllowedHosts(configuredHosts);
+      assert.equal(config.allowedGatewayHosts, null);
+      const response = await requestRaw("/gw/view-targets", {
+        host: "unlisted.example.test",
+        headers: { Authorization: "Bearer test-gateway-bearer-token-dummy-value" },
+      });
+      assert.equal(response.status, 200, `configuration kind: ${configuredHosts === undefined ? "unset" : "empty"}`);
+    }
+  } finally {
+    config.allowedGatewayHosts = originalHosts;
+  }
 });
 
 test("Gateway許可HostではGateway routeを受け付け、Host比較は大文字小文字を無視する", async () => {
