@@ -4,16 +4,16 @@
 
 ## 2026-11-19の現状確認（移行判定には使わない参考値）
 
-Supabase sourceとN094 Dokploy PostgreSQLを別々に読み取り、対象4表の件数だけを確認した。実行時刻が異なりsourceは稼働中のため、これは同一snapshot照合ではなく、本番移行の合格証跡にも使わない。
+2026-11-19 07:23–07:26 UTCにSupabase sourceとN094 Dokploy PostgreSQLを別々に読み取り、対象4表の件数を再確認した。sourceは稼働中で、2 DBの読み取りは同一transaction/snapshotではないため、本番移行の合格証跡には使わない。
 
 | table | Supabase source | N094 Dokploy DB（service environment: production） | 差（destination - source） |
 | --- | ---: | ---: | ---: |
 | `targets` | 19 | 19 | 0 |
-| `logs` | 400,721 | 388,522 | -12,199 |
+| `logs` | 409,005 | 388,522 | -20,483 |
 | `incidents` | 1 | 1 | 0 |
 | `watch_target_states` | 19 | 19 | 0 |
 
-N094の`logs`件数がsourceより12,199件少ないことを確認した。残る3表で件数が一致しても内容一致を示さない。Dokploy上の対象Compose appは`production`環境に属し、読み取り確認時点でAPI、PostgreSQL、maintenance schedulerが稼働中だった。DBの`migration_state.data_verified`も`true`だったが、これは現時点のsourceとの同一snapshot照合や本番切替準備の完了を示さない。既存DBをstaging用と決めつけず、既存volumeを保持し、新しいimport先として再利用・初期化しない。staging rehearsalと本番切替には、それぞれ既存DBと分離した専用の空DB/volumeを用意する。writer停止後の本番importでは、同一時点のschema、全行、期間別件数、sequence、FKをrunbookのmigration verifierと独立集計で照合する。
+N094の`logs`件数はsourceより20,483件少なかった。source `logs`の観測範囲は`2026-09-30 15:00:27.947+00`〜`2026-11-19 07:23:27.3+00`、N094は`2026-09-30 15:00:27.947+00`〜`2026-11-17 15:51:26.216+00`。残る3表で件数が一致しても内容一致を示さない。Dokploy上の対象Compose appは`production`環境に属し、読み取り確認時点でAPI、PostgreSQL、maintenance schedulerが稼働中だった。DBの`migration_state.data_verified`も`true`だったが、これは現時点のsourceとの同一snapshot照合や本番切替準備の完了を示さない。既存DBをstaging用と決めつけず、既存volumeを保持し、新しいimport先として再利用・初期化しない。staging rehearsalと本番切替には、それぞれ既存DBと分離した専用の空DB/volumeを用意する。writer停止後の本番importでは、同一時点のschema、全行、期間別件数、sequence、FKをrunbookのmigration verifierと独立集計で照合する。
 
 同日、専用Dokploy staging appへSupabase snapshotをimportし、`targets`、`logs`、`incidents`、`watch_target_states`の内容照合が成功した。これはimport時点のsnapshot照合であり、現在のSupabaseとの同期を示さない。staging API、PostgreSQL、maintenance schedulerはhealthyで、watch schedulerは停止中。`https://mikage-staging.inter.dedyn.io/health`は200、admin APIは200、未認証View APIは401を返した。Render PR Previewからstaging専用の一時targetを読み取る経路も確認し、試験後にそのtargetを無効化した。
 
