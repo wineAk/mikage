@@ -162,7 +162,7 @@ HTTPS URL、資格情報/fragmentなし、完全一致target host allowlist、HT
 
 ## Gateway API
 
-Render serverは `MIKAGE_GATEWAY_BASE_URL` にGateway hostを設定し、`MIKAGE_API_BEARER_TOKEN` をAuthorization headerへ設定する。`MIKAGE_GATEWAY_ROUTE_PREFIX` の既定値は `office/mikage` で、PR PreviewのStaging疎通時のみ `office/mikage-staging` を指定する。VPS Caddyの共通routeは対応するprefixを `/gw/` に置き換えて各環境のAPIへ転送する。Caddyで個別source/pathの許可一覧は持たず、APIが公開routeを限定する。`X-Origin-Verify` はCaddyからAPIへ転送しない。watch起動endpoint `/api/v1/watch` は別tokenを `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。
+Render serverは `MIKAGE_GATEWAY_BASE_URL` にGateway hostを設定し、`MIKAGE_API_BEARER_TOKEN` をAuthorization headerへ設定する。通常Render serviceでは `MIKAGE_GATEWAY_ROUTE_PREFIX` の既定値は `office/mikage` で、Staging prefixは拒否する。Render PR Preview（`IS_PULL_REQUEST=true`）ではView/monitoringを含むすべてのGateway読み書きが `MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` を明示するまでfail closedし、未設定時にProduction prefixへ既定フォールバックしない。PreviewでProduction prefixを明示しても拒否する。VPS Caddyの共通routeは対応するprefixを `/gw/` に置き換えて各環境のAPIへ転送する。Caddyで個別source/pathの許可一覧は持たず、APIが公開routeを限定する。`X-Origin-Verify` はCaddyからAPIへ転送しない。watch起動endpoint `/api/v1/watch` は別tokenを `Authorization: Bearer ...` headerで受け取る。query `key` は廃止したため、既存GAS triggerの切替はschedulerの本番化まで行わない。
 
 | Render source | method | Gateway API path | 既存handler |
 |---|---|---|---|

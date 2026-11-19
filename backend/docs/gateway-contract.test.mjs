@@ -41,8 +41,11 @@ test("Render source allowlist and API /gw routes stay aligned", () => {
   assert.match(gatewaySetup, /共通routeでprefixを `\/gw\/` に置き換えて/);
   assert.match(gatewaySetup, /`https:\/\/mikage\.inter\.dedyn\.io`/);
   assert.match(renderClient, /MIKAGE_GATEWAY_ROUTE_PREFIX/);
+  assert.match(renderClient, /IS_PULL_REQUEST/);
   assert.match(gatewaySetup, /`office\/mikage-staging`/);
   assert.match(apiContract, /`MIKAGE_GATEWAY_ROUTE_PREFIX`/);
+  assert.match(apiContract, /IS_PULL_REQUEST=true.*fail closed/s);
+  assert.match(apiContract, /office\/mikage-staging/);
   assert.match(apiContract, /Preview[^\n]+watch[^\n]+Staging API/);
   assert.match(gatewaySetup, /query stringはそのまま維持/);
   assert.match(gatewaySetup, /`X-Origin-Verify` はCaddyからAPIへ渡しません/);

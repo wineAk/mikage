@@ -241,7 +241,7 @@ test("Gateway route prefixはStaging namespaceだけを追加許可する", asyn
     await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
     process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
     process.env.IS_PULL_REQUEST = "false";
-    await assert.rejects(fetchMikageApi("view-targets"), /URLの設定が不正です/);
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
   } finally {
     if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
     else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
@@ -285,6 +285,8 @@ async function withGatewayFixture(execute) {
       response.end(JSON.stringify({ data: [{ key: "example", name: state.targetName, logs: [] }] }));
     } else if (path.endsWith("/view-incidents")) {
       response.end(JSON.stringify({ data: [] }));
+    } else if (path.endsWith("/watch-results") && request.method === "POST") {
+      response.end(JSON.stringify({ saved: true }));
     } else { response.writeHead(404); response.end(JSON.stringify({ code: "missing" })); }
   });
   try {
@@ -326,6 +328,82 @@ test("Staging route prefixを使って同じGateway hostから隔離namespaceへ
     assert.equal(state.requests[0].path, "/office/mikage-staging/view-targets");
     assert.equal(state.requests[0].query.get("source"), "preview");
     assert.equal(state.requests[0].authorization, "Bearer example-api-token");
+  });
+});
+
+test("PR Previewはroute prefix未設定でfail closedし、fetchを呼ばない", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    process.env.IS_PULL_REQUEST = "true";
+    delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    globalThis.fetch = (...arguments_) => {
+      fetchCalls++;
+      return previousFetch(...arguments_);
+    };
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("PR PreviewはProduction route prefixを拒否し、fetchを呼ばない", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousRoutePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    process.env.IS_PULL_REQUEST = "true";
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage";
+    globalThis.fetch = (...arguments_) => {
+      fetchCalls++;
+      return previousFetch(...arguments_);
+    };
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousRoutePrefix === undefined) delete process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+    else process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = previousRoutePrefix;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("PR PreviewのStaging prefixはwatch POSTも同一namespaceへ送る", async () => {
+  await withGatewayFixture(async (state) => {
+    process.env.MIKAGE_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
+    process.env.IS_PULL_REQUEST = "true";
+    const result = await fetchMikageApi("watch-results", {
+      method: "POST",
+      body: { results: [{ key: "example", status: "ok" }] },
+    });
+    assert.equal(result.saved, true);
+    assert.equal(state.requests.at(-1).path, "/office/mikage-staging/watch-results");
+    assert.equal(state.requests.at(-1).authorization, "Bearer example-api-token");
   });
 });
 

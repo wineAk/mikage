@@ -13,17 +13,33 @@ const GATEWAY_SOURCES = [
 ] as const;
 
 const DEFAULT_GATEWAY_ROUTE_PREFIX = "office/mikage";
+const STAGING_GATEWAY_ROUTE_PREFIX = "office/mikage-staging";
 const ALLOWED_GATEWAY_ROUTE_PREFIXES = new Set([
   DEFAULT_GATEWAY_ROUTE_PREFIX,
-  "office/mikage-staging",
+  STAGING_GATEWAY_ROUTE_PREFIX,
 ]);
+
+function resolveGatewayRoutePrefix(): string {
+  const isPullRequest = process.env.IS_PULL_REQUEST === "true";
+  const configuredPrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX;
+  if (isPullRequest) {
+    if (configuredPrefix !== STAGING_GATEWAY_ROUTE_PREFIX) {
+      throw new Error("ミカゲAPI Gatewayの設定が不正です。");
+    }
+    return STAGING_GATEWAY_ROUTE_PREFIX;
+  }
+  const routePrefix = configuredPrefix ?? DEFAULT_GATEWAY_ROUTE_PREFIX;
+  if (routePrefix === STAGING_GATEWAY_ROUTE_PREFIX || !ALLOWED_GATEWAY_ROUTE_PREFIXES.has(routePrefix)) {
+    throw new Error("ミカゲAPI Gatewayの設定が不正です。");
+  }
+  return routePrefix;
+}
 
 export type MikageGatewaySource = typeof GATEWAY_SOURCES[number];
 
 function getGatewayConfig() {
   const baseUrl = process.env.MIKAGE_GATEWAY_BASE_URL?.replace(/\/+$/, "");
   const token = process.env.MIKAGE_API_BEARER_TOKEN;
-  const routePrefix = process.env.MIKAGE_GATEWAY_ROUTE_PREFIX ?? DEFAULT_GATEWAY_ROUTE_PREFIX;
   if (!baseUrl || !token) {
     throw new Error("ミカゲAPI Gatewayのserver環境変数が未設定です。");
   }
@@ -34,9 +50,8 @@ function getGatewayConfig() {
     && parsed.pathname === "/"
     && !parsed.search
     && !parsed.hash;
-  const hasValidRoutePrefix = ALLOWED_GATEWAY_ROUTE_PREFIXES.has(routePrefix);
-  const isStagingRouteAllowed = routePrefix !== "office/mikage-staging" || process.env.IS_PULL_REQUEST === "true";
-  if (!hasValidGatewayUrl || !hasValidRoutePrefix || !isStagingRouteAllowed) {
+  const routePrefix = resolveGatewayRoutePrefix();
+  if (!hasValidGatewayUrl) {
     throw new Error("ミカゲAPI Gatewayの設定が不正です。");
   }
   return { baseUrl, routePrefix, token };

@@ -4,7 +4,7 @@
 
 Render clientは `MIKAGE_GATEWAY_BASE_URL` に設定したGatewayへ、route prefixとsourceを付けて要求します。Productionでは `MIKAGE_GATEWAY_ROUTE_PREFIX` の既定値 `office/mikage` を使います。CloudFront経由でRackNerdまたはGreenCloudのCaddyへ到達し、Caddyは共通routeでprefixを `/gw/` に置き換えてProduction APIへ転送します。pathの残りとquery stringはそのまま維持し、`X-Origin-Verify` はCaddyからAPIへ渡しません。
 
-Render PR PreviewをStagingへ隔離するときは、Previewだけで `MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` とし、`MIKAGE_API_BEARER_TOKEN`にはStaging API専用値を設定します。両VPSのCaddyには `/office/mikage-staging/` を `/gw/` に置き換え、Dokploy StagingのAPI service domainへ転送する共通routeが必要です。Production prefixとupstreamは変更しません。source名のallowlistは引き続きAPIだけが持ちます。
+Render PR PreviewをStagingへ隔離するときは、Previewだけで `MIKAGE_GATEWAY_ROUTE_PREFIX=office/mikage-staging` を明示し、`MIKAGE_API_BEARER_TOKEN`にはStaging API専用値を設定します。`IS_PULL_REQUEST=true` のPreviewではView/monitoringを含むすべてのGateway読み書きがStaging prefixを明示するまでfail closedし、未設定時にProduction prefixへ既定フォールバックしません。両VPSのCaddyには `/office/mikage-staging/` を `/gw/` に置き換え、Dokploy StagingのAPI service domainへ転送する共通routeが必要です。Production prefixとupstreamは変更しません。source名のallowlistは引き続きAPIだけが持ちます。
 
 CaddyにはMikage個別のsource/path allowlistを置きません。公開できるoperationはAPIが持つ `/gw` routeだけです。APIがrouteを持たないpathや誤methodは404になります。`/admin`、`/admin.js`、`/v1/admin/*` はCaddyから転送されても `/gw` namespace内では定義されないため到達できません。
 
