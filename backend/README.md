@@ -102,13 +102,31 @@ schema照合では列名で定義を対応付けるため列の並び順は問�
 
 ## テスト
 
-専用test profileを使う。API runtime roleと、fixtureのreset専用DB管理roleを分離してテストする。
+統合テストは **本番 `postgres` / `mikage_postgres_data` とは別** の test profile 専用 PostgreSQL に接続する。API suite 用と maintenance suite 用で PostgreSQL service・named volume・migration を分離し、TRUNCATE/DELETE/DDL が通常 DB `mikage` に当たらないようにする。test 用 named volumeは実行後も保持される。`--profile test` で profile 全体を `up` しないこと。対象の test service だけを個別に `run --rm` する。
+
+test-only の Dokploy secret（本番 `POSTGRES_PASSWORD` / `MIKAGE_*_DB_PASSWORD` は流用しない）:
+
+| 変数名 | 用途 |
+| --- | --- |
+| `MIKAGE_TEST_POSTGRES_PASSWORD` | PostgreSQL 17 test superuser（`postgres-test-api` / `postgres-test-maintenance`）。未設定だと test Postgres は起動に失敗する。 |
+| `MIKAGE_TEST_API_DB_PASSWORD` | API 統合テストの `mikage_api` role（`postgres-test-api` 向け migration / `integration-tests`） |
+| `MIKAGE_TEST_MAINTENANCE_DB_PASSWORD` | maintenance 統合テストの `mikage_maintenance` role（`postgres-test-maintenance` 向け migration / `maintenance-integration-tests`） |
+
+任意: `MIKAGE_TEST_POSTGRES_USER`（既定 `postgres`）、`MIKAGE_TEST_API_BEARER_TOKEN`（API 統合テスト用 Bearer。未設定時は Compose 内の固定テスト値）。
+
+DB 名はいずれも `mikage_test`。suite コンテナには `MIKAGE_TEST_DATABASE_ISOLATED=true` を付与し、application pool（`PG*`）と fixture pool（`TEST_PG*`）が同一 host/port/database であること、および DB 名が `_test` サフィックスを持つことを接続前に検証する。
 
 ```bash
+cd backend/compose
+
+# API 統合（postgres-test-api のみ依存。本番 postgres はグラフに入らない）
 docker compose -f docker-compose.yml -f docker-compose.local.yml --profile test run --build --rm integration-tests
+
+# maintenance / snapshot 統合（postgres-test-maintenance のみ依存）
+docker compose -f docker-compose.yml -f docker-compose.local.yml --profile test run --build --rm maintenance-integration-tests
 ```
 
-`integration-tests` は `test` profile限定で、通常のDokploy deployでは起動しない。fixture投入のため管理roleを使うのはテストserviceのみ。
+`integration-tests` と `maintenance-integration-tests` は `test` profile 限定で、通常の Dokploy deploy（`COMPOSE_PROFILES` 空欄）では起動しない。test-only secret が未設定でも通常 profile の config 解析・起動は可能。test suite 実行時だけ上記 secret が必要。
 
 Render source allowlist、API `/gw` method/path、既存API endpointへのdispatch対応はrepository rootから `node --test backend/docs/gateway-contract.test.mjs` で確認する。この契約testはCompose test containerへ持ち込まず、Git checkout上で実行する。
 

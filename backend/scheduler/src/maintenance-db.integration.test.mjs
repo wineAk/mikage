@@ -2,8 +2,15 @@ import assert from "node:assert/strict";
 import pg from "pg";
 import test, { after } from "node:test";
 import { runMaintenanceJob } from "./maintenance-scheduler.mjs";
+import { assertTestDatabaseIsolated as assertIsolated } from "./test-database-isolation.mjs";
+
+const assertTestDatabaseIsolated = (environment = process.env) =>
+  assertIsolated("postgres-test-maintenance", environment);
 
 const databaseConfigured = Boolean(process.env.TEST_PGHOST);
+if (databaseConfigured) {
+  assertTestDatabaseIsolated();
+}
 const pool = databaseConfigured
   ? new pg.Pool({
       host: process.env.TEST_PGHOST,
@@ -28,6 +35,7 @@ after(async () => {
 });
 
 test("maintenance DB role prunes only past retention and can reindex only owned tables", { skip: !databaseConfigured }, async () => {
+  assertTestDatabaseIsolated();
   const ownership = await pool.query("SELECT current_user, pg_has_role(current_user, 'mikage_data_owner', 'member') AS owns_maintenance_tables");
   assert.equal(ownership.rows[0].current_user, "mikage_maintenance");
   assert.equal(ownership.rows[0].owns_maintenance_tables, true);

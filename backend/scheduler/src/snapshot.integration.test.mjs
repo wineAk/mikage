@@ -1,8 +1,15 @@
 import assert from "node:assert/strict";
 import pg from "pg";
 import test, { after } from "node:test";
+import { assertTestDatabaseIsolated as assertIsolated } from "./test-database-isolation.mjs";
+
+const assertTestDatabaseIsolated = (environment = process.env) =>
+  assertIsolated("postgres-test-maintenance", environment);
 
 const databaseConfigured = Boolean(process.env.TEST_PGHOST);
+if (databaseConfigured) {
+  assertTestDatabaseIsolated();
+}
 const pool = databaseConfigured
   ? new pg.Pool({
       host: process.env.TEST_PGHOST,
@@ -19,6 +26,7 @@ after(async () => {
 });
 
 test("exported read-only snapshot keeps row reads stable across a concurrent committed write", { skip: !databaseConfigured }, async () => {
+  assertTestDatabaseIsolated();
   const tableName = `snapshot_probe_${crypto.randomUUID().replaceAll("-", "")}`;
   const setup = await pool.connect();
   const exporter = await pool.connect();

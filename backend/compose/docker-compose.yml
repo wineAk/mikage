@@ -203,6 +203,112 @@ services:
     cpus: 0.25
     mem_limit: 128m
 
+  postgres-test-api:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      POSTGRES_DB: mikage_test
+    volumes:
+      - mikage_postgres_test_api_data:/var/lib/postgresql/data
+    networks:
+      - mikage_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    cpus: 0.5
+    mem_limit: 256m
+
+  postgres-test-maintenance:
+    profiles: ["test"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      POSTGRES_DB: mikage_test
+    volumes:
+      - mikage_postgres_test_maintenance_data:/var/lib/postgresql/data
+    networks:
+      - mikage_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    cpus: 0.5
+    mem_limit: 256m
+
+  migrate-test-api:
+    profiles: ["test"]
+    build:
+      context: ../db
+      dockerfile: Dockerfile
+    working_dir: /db
+    environment:
+      PGHOST: postgres-test-api
+      PGPORT: "5432"
+      PGUSER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      PGPASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      PGDATABASE: mikage_test
+      MIKAGE_API_DB_PASSWORD: ${MIKAGE_TEST_API_DB_PASSWORD:-}
+      MIKAGE_MAINTENANCE_DB_PASSWORD: ${MIKAGE_TEST_MAINTENANCE_DB_PASSWORD:-}
+    command: ["node", "migrate.mjs"]
+    networks:
+      - mikage_internal
+    depends_on:
+      postgres-test-api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    cpus: 0.5
+    mem_limit: 256m
+
+  migrate-test-maintenance:
+    profiles: ["test"]
+    build:
+      context: ../db
+      dockerfile: Dockerfile
+    working_dir: /db
+    environment:
+      PGHOST: postgres-test-maintenance
+      PGPORT: "5432"
+      PGUSER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      PGPASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      PGDATABASE: mikage_test
+      MIKAGE_API_DB_PASSWORD: ${MIKAGE_TEST_API_DB_PASSWORD:-}
+      MIKAGE_MAINTENANCE_DB_PASSWORD: ${MIKAGE_TEST_MAINTENANCE_DB_PASSWORD:-}
+    command: ["node", "migrate.mjs"]
+    networks:
+      - mikage_internal
+    depends_on:
+      postgres-test-maintenance:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    cpus: 0.5
+    mem_limit: 256m
+
   integration-tests:
     profiles: ["test"]
     build:
@@ -210,29 +316,28 @@ services:
       dockerfile: Dockerfile
     command: ["npm", "test"]
     environment:
-      PGHOST: postgres
+      MIKAGE_TEST_DATABASE_ISOLATED: "true"
+      PGHOST: postgres-test-api
       PGPORT: "5432"
       PGUSER: mikage_api
-      PGPASSWORD: ${MIKAGE_API_DB_PASSWORD:?MIKAGE_API_DB_PASSWORD is required}
-      PGDATABASE: ${POSTGRES_DB:-mikage}
-      MIKAGE_API_BEARER_TOKEN: ${MIKAGE_API_BEARER_TOKEN:?MIKAGE_API_BEARER_TOKEN is required}
+      PGPASSWORD: ${MIKAGE_TEST_API_DB_PASSWORD:-}
+      PGDATABASE: mikage_test
+      MIKAGE_API_BEARER_TOKEN: ${MIKAGE_TEST_API_BEARER_TOKEN:-integration-test-bearer-token}
       MIKAGE_ADMIN_ALLOWED_HOSTS: ${MIKAGE_ADMIN_ALLOWED_HOSTS:-admin.example.test}
-      MIKAGE_MAINTENANCE_DB_PASSWORD: ${MIKAGE_MAINTENANCE_DB_PASSWORD:?MIKAGE_MAINTENANCE_DB_PASSWORD is required}
       MIKAGE_TARGET_ALLOWED_HOSTS: ${MIKAGE_TARGET_ALLOWED_HOSTS:-api.example.test}
-      TEST_PGHOST: postgres
+      TEST_PGHOST: postgres-test-api
       TEST_PGPORT: "5432"
-      TEST_PGUSER: ${POSTGRES_USER:-postgres}
-      TEST_PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      TEST_PGDATABASE: ${POSTGRES_DB:-mikage}
-      TEST_MAINTENANCE_PGPASSWORD: ${MIKAGE_MAINTENANCE_DB_PASSWORD:?MIKAGE_MAINTENANCE_DB_PASSWORD is required}
+      TEST_PGUSER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      TEST_PGPASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      TEST_PGDATABASE: mikage_test
     volumes:
       - ../api/tests:/app/tests:ro
     networks:
       - mikage_internal
     depends_on:
-      migrate:
+      migrate-test-api:
         condition: service_completed_successfully
-      postgres:
+      postgres-test-api:
         condition: service_healthy
 
   maintenance-integration-tests:
@@ -242,23 +347,24 @@ services:
       dockerfile: Dockerfile
     command: ["npm", "test"]
     environment:
-      PGHOST: postgres
+      MIKAGE_TEST_DATABASE_ISOLATED: "true"
+      PGHOST: postgres-test-maintenance
       PGPORT: "5432"
       PGUSER: mikage_maintenance
-      PGPASSWORD: ${MIKAGE_MAINTENANCE_DB_PASSWORD:?MIKAGE_MAINTENANCE_DB_PASSWORD is required}
-      PGDATABASE: ${POSTGRES_DB:-mikage}
-      TEST_PGHOST: postgres
+      PGPASSWORD: ${MIKAGE_TEST_MAINTENANCE_DB_PASSWORD:-}
+      PGDATABASE: mikage_test
+      TEST_PGHOST: postgres-test-maintenance
       TEST_PGPORT: "5432"
-      TEST_PGUSER: ${POSTGRES_USER:-postgres}
-      TEST_PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-      TEST_MAINTENANCE_PGPASSWORD: ${MIKAGE_MAINTENANCE_DB_PASSWORD:?MIKAGE_MAINTENANCE_DB_PASSWORD is required}
-      TEST_PGDATABASE: ${POSTGRES_DB:-mikage}
+      TEST_PGUSER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
+      TEST_PGPASSWORD: ${MIKAGE_TEST_POSTGRES_PASSWORD:-}
+      TEST_MAINTENANCE_PGPASSWORD: ${MIKAGE_TEST_MAINTENANCE_DB_PASSWORD:-}
+      TEST_PGDATABASE: mikage_test
     networks:
       - mikage_internal
     depends_on:
-      migrate:
+      migrate-test-maintenance:
         condition: service_completed_successfully
-      postgres:
+      postgres-test-maintenance:
         condition: service_healthy
 
   migration-preflight:
@@ -350,5 +456,7 @@ networks:
 
 volumes:
   mikage_postgres_data:
+  mikage_postgres_test_api_data:
+  mikage_postgres_test_maintenance_data:
   mikage_watch_scheduler_state:
   mikage_maintenance_scheduler_state:

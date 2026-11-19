@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import test, { before } from "node:test";
 
-import { createApp } from "../src/app.mjs";
-import { pool as apiPool } from "../src/db.mjs";
-import { PREVIEW_ALLOWED_HOSTS } from "../src/preview-target-hosts.mjs";
-import { authHeaders, createTestPool, resetMonitoringFixture, startTestServer } from "./helpers.mjs";
+import {
+  assertTestDatabaseIsolated,
+  authHeaders,
+  createTestPool,
+  resetMonitoringFixture,
+  startTestServer,
+} from "./helpers.mjs";
 
 function fetchAdmin(baseUrl, path, init = {}) {
   const url = new URL(path, baseUrl);
@@ -48,10 +51,21 @@ process.env.MIKAGE_ADMIN_ALLOWED_HOSTS ??= "admin.example.test";
 process.env.MIKAGE_TARGET_ALLOWED_HOSTS ??= "api.example.test";
 
 const databaseConfigured = Boolean(process.env.TEST_PGHOST);
+if (databaseConfigured) {
+  assertTestDatabaseIsolated();
+}
+
+const [{ createApp }, { pool: apiPool }, { PREVIEW_ALLOWED_HOSTS }] = await Promise.all([
+  import("../src/app.mjs"),
+  import("../src/db.mjs"),
+  import("../src/preview-target-hosts.mjs"),
+]);
+
 const bearerToken = apiBearerToken;
 
 before(async () => {
   if (!databaseConfigured) return;
+  assertTestDatabaseIsolated();
   const pool = await createTestPool();
   try {
     await pool.query(
