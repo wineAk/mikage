@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { assertTestDatabaseIsolated } from "./helpers.mjs";
 
@@ -31,10 +31,14 @@ test("API fixture DB guard rejects unsafe or mismatched DB configuration", () =>
     () => assertTestDatabaseIsolated({ ...isolatedApiDatabase, PGHOST: "postgres", TEST_PGHOST: "postgres" }),
     /同一の test PostgreSQL/
   );
+  assert.throws(
+    () => assertTestDatabaseIsolated({ ...isolatedApiDatabase, PGHOST: undefined }),
+    /同一の test PostgreSQL/
+  );
   assert.doesNotThrow(() => assertTestDatabaseIsolated(isolatedApiDatabase));
 });
 
-test("monitoring API rejects an unverified test destination before loading the application pool", () => {
+test("monitoring API rejects a mismatched test destination before loading application modules", () => {
   const childEnvironment = {
     PATH: process.env.PATH ?? "",
     SystemRoot: process.env.SystemRoot ?? "",
@@ -45,7 +49,6 @@ test("monitoring API rejects an unverified test destination before loading the a
     PGDATABASE: "mikage_test",
   };
   const monitoringTestUrl = new URL("./monitoring-api.test.mjs", import.meta.url).href;
-  const expectedTestPath = fileURLToPath(new URL("./monitoring-api.test.mjs", import.meta.url)).replaceAll("\\", "/");
   const result = spawnSync(
     process.execPath,
     ["--input-type=module", "-e", `await import(${JSON.stringify(monitoringTestUrl)})`],
@@ -54,6 +57,15 @@ test("monitoring API rejects an unverified test destination before loading the a
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /PG\* と TEST_PG\* は同一の test PostgreSQL/);
-  assert.match(result.stderr, new RegExp(expectedTestPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.doesNotMatch(result.stderr, /PGHOST が未設定です/);
+});
+
+test("monitoring API checks test DB isolation before importing the application pool", () => {
+  const monitoringTestSource = readFileSync(new URL("./monitoring-api.test.mjs", import.meta.url), "utf8");
+  const guardIndex = /if \(databaseConfigured\) \{\s*assertTestDatabaseIsolated\(\);\s*\}/.exec(monitoringTestSource)?.index ?? -1;
+  const applicationImportIndex = /await Promise\.all\(\[\s*import\("\.\.\/src\/app\.mjs"\),\s*import\("\.\.\/src\/db\.mjs"\)/.exec(monitoringTestSource)?.index ?? -1;
+
+  assert.notEqual(guardIndex, -1);
+  assert.notEqual(applicationImportIndex, -1);
+  assert.ok(guardIndex < applicationImportIndex);
+  assert.doesNotMatch(monitoringTestSource, /^\s*import\s+.*from\s+["']\.\.\/src\/(?:app|db)\.mjs["']/m);
 });
