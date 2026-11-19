@@ -42,7 +42,7 @@ Render PR Previewからのwatch実行/read-back、通知failure injection、独�
   | `watch-scheduler` | `mikage_egress` | detach |
 
   Preview Composeと`docker network inspect`で、共有networkにはMikageの`api`以外が参加せず既存memberが変化していないことを確認する。Postgres・scheduler・test/migration serviceに公開Domain/host portがない。
-- [ ] Dokploy Compose環境の `COMPOSE_PROFILES` は空欄にする。通常起動では`postgres`、`migrate`、`api`、`maintenance-scheduler`が起動し、`watch-scheduler`とmigration/test profile serviceは起動しない。`watch` profileはRender/GAS切替の承認後だけ有効にする。
+- [ ] Production Dokploy appの `COMPOSE_PROFILES` は本番切替前は空欄にする。通常起動では`postgres`、`migrate`、`api`、`maintenance-scheduler`が起動し、`watch-scheduler`とmigration/test profile serviceは起動しない。本番の`watch` profileはGAS停止を確認してから切替承認に従って有効化する。独立したStaging appでは、Preview通知mockとStaging専用tokenを確認した後、リハーサルおよび観察のため`watch` profileを有効化してよい。
 - DokployのEnvironment SettingsはKey/Value行を追加する画面ではなく、Compose用`.env`をまとめて編集する複数行欄。既存内容を置き換えず、必要な変数を `KEY=value` 形式で1変数につき1行追記する。secretを含む既存値は画面表示・ログ出力・リポジトリへの転記をしない。保存だけでは稼働中containerに反映されず、対象のMikage Staging serviceを手動deployした後に反映状態を確認する。
 - [ ] `migration-verify`成功前も`/health`はDB接続を返し、それ以外の全routeが503で閉じることを確認する。health 200はmigration gate通過を意味しない。maintenance schedulerはAPI healthcheck成功後に起動し、各job直前にDB gateを再確認する。
 - [ ] APIの `MIKAGE_ADMIN_ALLOWED_HOSTS` はLAN専用Domainのみ、`MIKAGE_TARGET_ALLOWED_HOSTS` は現在のenabled target hostを完全一致で含む。
