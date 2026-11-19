@@ -323,8 +323,8 @@ services:
       PGPASSWORD: ${MIKAGE_TEST_API_DB_PASSWORD:-}
       PGDATABASE: mikage_test
       MIKAGE_API_BEARER_TOKEN: ${MIKAGE_TEST_API_BEARER_TOKEN:-integration-test-bearer-token}
-      MIKAGE_ADMIN_ALLOWED_HOSTS: ${MIKAGE_ADMIN_ALLOWED_HOSTS:-admin.example.test}
-      MIKAGE_TARGET_ALLOWED_HOSTS: ${MIKAGE_TARGET_ALLOWED_HOSTS:-api.example.test}
+      MIKAGE_ADMIN_ALLOWED_HOSTS: admin.example.test
+      MIKAGE_TARGET_ALLOWED_HOSTS: api.example.test
       TEST_PGHOST: postgres-test-api
       TEST_PGPORT: "5432"
       TEST_PGUSER: ${MIKAGE_TEST_POSTGRES_USER:-postgres}
