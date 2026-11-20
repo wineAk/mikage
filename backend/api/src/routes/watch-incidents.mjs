@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Router } from "express";
 import { pool, withClient } from "../db.mjs";
 import { requireBearerAuth } from "../middleware/auth.mjs";
+import { isValidWatchIncidentRequestId } from "../watch-incident-request-id.mjs";
 
 export const watchIncidentsRouter = Router();
 
@@ -16,7 +17,7 @@ function isValidIncidentId(value) {
 
 function validate(body) {
   if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).some((field) => !fields.includes(field))) return "bodyが不正です。";
-  if (typeof body.request_id !== "string" || !/^[A-Za-z0-9:_-]{1,160}$/.test(body.request_id)) return "request_idが不正です。";
+  if (!isValidWatchIncidentRequestId(body.request_id)) return "request_idが不正です。";
   if (!operations.has(body.operation) || !labels.has(body.keyword)) return "operationまたはkeywordが不正です。";
   if (typeof body.now !== "string" || Number.isNaN(Date.parse(body.now)) || new Date(body.now).toISOString() !== body.now) return "nowが不正です。";
   if (body.operation === "open" && (body.incident_id !== null || body.count !== 1)) return "openの引数が不正です。";
