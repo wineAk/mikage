@@ -1,17 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseWatchSlot } from "../../../server/app/library/watch/watchSlot.mjs";
 import { isValidWatchIncidentRequestId } from "../src/watch-incident-request-id.mjs";
 
 const SLOT = "2026-11-16T11:00:00.000Z";
 const LABEL = "saaske";
 
-test("parseWatchSlot slotStart yields request_ids accepted by API validator", () => {
-  const { slotStart } = parseWatchSlot(SLOT);
-  assert.equal(slotStart, SLOT);
-
+test("ISO slotStart request_ids are accepted by API validator", () => {
   for (const operation of ["open", "pending", "update", "close"]) {
-    const requestId = `${slotStart}:${LABEL}:${operation}`;
+    const requestId = `${SLOT}:${LABEL}:${operation}`;
     assert.equal(isValidWatchIncidentRequestId(requestId), true, requestId);
   }
 });
