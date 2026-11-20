@@ -6,7 +6,10 @@ import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { existsSync } from "node:fs";
 import sanitizeHtml from "sanitize-html";
-import { createClient } from "./app/lib/supabase/index.js";
+import { fetchMikageApi } from "./app/lib/mikageApi.server.js";
+import { isRequestIpAllowed } from "./app/library/ipRestriction.mjs";
+import { isAllowedPreviewTargetUrl } from "./app/library/watch/previewTargetUrl.mjs";
+import { isIpRestrictionExemptPath } from "./app/library/watch/ipRestrictionExemptPath.mjs";
 
 // .envファイルから環境変数を読み込み
 dotenv.config();
@@ -23,13 +26,12 @@ const allowedIps = (process.env.ALLOWED_IPS || "").split(",").map(ip => ip.trim(
 
 // IP制御ミドルウェア（staticルートより前に）
 app.use((req, res, next) => {
-  const reqHeadForwardedFor = req.headers["x-forwarded-for"];
-  const reqIp = (Array.isArray(reqHeadForwardedFor) ? reqHeadForwardedFor[0] : reqHeadForwardedFor) || req.ip;
-  const ipToCheck = reqIp || "";
-  const ipList = ipToCheck.split(",").map(ip => ip.trim());
-  const isAllowed = allowedIps.length === 0 || ipList.some(ip => allowedIps.includes(ip));
+  const cloudflareClientIpHeader = req.headers["cf-connecting-ip"];
+  const requestIp = (Array.isArray(cloudflareClientIpHeader) ? cloudflareClientIpHeader[0] : cloudflareClientIpHeader)
+    || req.socket.remoteAddress;
+  const isAllowed = isRequestIpAllowed(requestIp, allowedIps);
   // /api/v1/watch だけはIP制限スキップ
-  if (/\/api\/v1\/watch/.test(req.path)) {
+  if (isIpRestrictionExemptPath(req.path)) {
     return next();
   }
   // 許可IP以外は403エラー
@@ -138,27 +140,16 @@ app.get("/:key", async (req, res, next) => {
   if (typeof key !== "string") return res.redirect("/");
   // 画面とReact Routerのデータ要求は外部サイトのキーとして照会しない。
   if (["incidents", "errors", "login"].includes(key) || key.endsWith(".data")) return next();
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const fullUrl = new URL(key, baseUrl).toString();
   try {
-    const fetchRequest = new Request(fullUrl, {
-      method: req.method,
-      headers: new Headers(
-        Object.entries(req.headers).map(
-          ([k, v]) =>
-            [k, Array.isArray(v) ? v.join(",") : v ?? ""] as [string, string]
-        )
-      ),
-    });
-
-    const { supabase } = createClient(fetchRequest, "mikage");
-    const { data } = await supabase.from("targets").select("*").eq("key", key);
-    if (!data || data.length === 0) return next(); // DBに存在しないkeyはReact Routerに処理を委ねる
-    const { name, url, headers } = data[0]; // 1件目を使う
+    const { target } = await fetchMikageApi<{
+      target: { name: string; url: string; headers: Record<string, string> | null } | null;
+    }>("view-target-proxy", { query: new URLSearchParams({ key }) });
+    if (!target) return next(); // DBに存在しないkeyはReact Routerに処理を委ねる
+    const { name, url, headers } = target;
     // 接続
     // https://(.*).saaske.com, https://(.*.).secure-link.jp, https://www.interpark.co.jp, https://(.*).works.app/ だけ許可
-    if (!/https:\/\/(?:(?:api|my|www|works)\.saaske\.com|(?:script\.)?secure-link\.jp|www\.interpark\.co\.jp|kensyo-tes2?\.works\.app\/)/.test(url)) return next();
-    const response = await fetch(url, { headers });
+    if (!isAllowedPreviewTargetUrl(url)) return next();
+    const response = await fetch(url, { headers: headers ?? undefined });
     const rawBody = await response.text();
     
     // XSS対策: 外部HTMLをサニタイズ
@@ -174,7 +165,7 @@ app.get("/:key", async (req, res, next) => {
     // XSS対策: サニタイズ済みのbodyを送信
     res.send(finalBody);
   } catch (error) {
-    console.error("Proxy Error:", error);
+    console.error("Proxy Error:", error instanceof Error ? error.name : "UnknownError");
     res.status(500).send("❌ 外部アクセスに失敗しました");
   }
 });

@@ -1,0 +1,11 @@
+{
+  "name": "mikage-service-scheduler",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-concurrency=1 src/*.test.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.16.0"
+  }
+}

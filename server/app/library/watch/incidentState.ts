@@ -1,62 +1,22 @@
 import type { LogResult } from "@/types/watch";
-import type { Database } from "@/types/supabase";
 
-export type WatchTargetState = Database["mikage"]["Tables"]["watch_target_states"]["Row"];
+export type WatchTargetState = {
+  target_key: string;
+  last_reserved_at: string | null;
+  last_checked_at: string | null;
+  first_failed_at: string | null;
+  failure_confirmed_at: string | null;
+  response_time: number | null;
+  status_code: number | null;
+  status_message: string | null;
+  error_name: string | null;
+  error_code: string | null;
+};
 
 type Target = {
   key: string;
   name: string;
 };
-
-export type WatchTargetStateUpdate = Database["mikage"]["Tables"]["watch_target_states"]["Insert"];
-
-export function isWatchFailure(result: LogResult) {
-  const hasErrorStatus = result.log.statusCode !== 200;
-  const hasActionableError =
-    result.log.errorCode !== null && result.log.errorCode !== "NO_INTERNET";
-
-  return hasErrorStatus || hasActionableError;
-}
-
-export function createWatchTargetStateUpdates(
-  results: LogResult[],
-  previousStates: WatchTargetState[],
-  reservedAt: string
-): WatchTargetStateUpdate[] {
-  const previousStateByKey = new Map(
-    previousStates.map((state) => [state.target_key, state])
-  );
-
-  return results.map((result) => {
-    const previousState = previousStateByKey.get(result.key);
-    const checkedAt = new Date(result.log.startDate).toISOString();
-    const hasFailed = isWatchFailure(result);
-    let firstFailedAt: string | null = null;
-    let failureConfirmedAt: string | null = null;
-
-    if (hasFailed) {
-      firstFailedAt = previousState?.first_failed_at ?? checkedAt;
-      if (previousState?.failure_confirmed_at) {
-        failureConfirmedAt = previousState.failure_confirmed_at;
-      } else if (Date.parse(checkedAt) - Date.parse(firstFailedAt) >= 5 * 60 * 1000) {
-        failureConfirmedAt = checkedAt;
-      }
-    }
-
-    return {
-      target_key: result.key,
-      last_reserved_at: reservedAt,
-      last_checked_at: checkedAt,
-      first_failed_at: firstFailedAt,
-      failure_confirmed_at: failureConfirmedAt,
-      response_time: result.log.responseTime,
-      status_code: result.log.statusCode,
-      status_message: result.log.statusMessage,
-      error_name: result.log.errorName,
-      error_code: result.log.errorCode,
-    };
-  });
-}
 
 export function getServiceLabel(targetKey: string):
   | "saaske"

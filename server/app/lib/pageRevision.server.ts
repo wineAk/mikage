@@ -1,8 +1,10 @@
 import { createHash } from "node:crypto";
-import { parseCookieHeader } from "@supabase/ssr";
-import { createClient } from "./supabase";
+import {
+  fetchMikageApi,
+  isMikageGatewayConfigured,
+  resolveMikageGatewayApp,
+} from "./mikageApi.server";
 
-const clientsByRequest = new WeakMap<Request, ReturnType<typeof createClient>>();
 const sessionCookiePattern = /^sb-.*-auth-token(?:-code-verifier)?(?:\.\d+)?$/;
 
 export function isPageCacheEnabled(): boolean {
@@ -11,19 +13,29 @@ export function isPageCacheEnabled(): boolean {
 
 export function isPageCacheEligible(request: Request): boolean {
   if (request.headers.has("Authorization")) return false;
-  try {
-    return !parseCookieHeader(request.headers.get("Cookie") ?? "").some(cookie => sessionCookiePattern.test(cookie.name));
-  } catch {
-    return false;
-  }
+  const cookieHeader = request.headers.get("Cookie") ?? "";
+  const hasSessionCookie = cookieHeader.split(";").some((cookie) => {
+    const separatorIndex = cookie.indexOf("=");
+    const cookieName = (separatorIndex === -1 ? cookie : cookie.slice(0, separatorIndex)).trim();
+    return sessionCookiePattern.test(cookieName);
+  });
+  return !hasSessionCookie;
 }
 
 export function getPageCacheScope(request: Request): string | null {
   if (!isPageCacheEligible(request)) return null;
+  if (!isMikageGatewayConfigured()) return null;
+  let gatewayApp: string;
+  try {
+    gatewayApp = resolveMikageGatewayApp();
+  } catch {
+    return null;
+  }
   // 認証値やCookieをキーへ直接保存せず、プロジェクトと利用者の境界を分ける。
   return createHash("sha256").update(JSON.stringify([
-    process.env.VITE_SUPABASE_URL ?? "",
-    process.env.VITE_SUPABASE_ANON_KEY ?? "",
+    process.env.MIKAGE_GATEWAY_BASE_URL ?? "",
+    gatewayApp,
+    process.env.MIKAGE_API_BEARER_TOKEN ?? "",
     "mikage",
     "anonymous",
     request.headers.get("Cookie") ?? "",
@@ -35,16 +47,12 @@ export function getPageCacheScope(request: Request): string | null {
 export async function readPageRevision(request: Request): Promise<string | null> {
   if (!isPageCacheEnabled()) return null;
   if (!isPageCacheEligible(request)) return null;
+  if (!isMikageGatewayConfigured()) return null;
   request.signal.throwIfAborted();
   try {
-    let client = clientsByRequest.get(request);
-    if (!client) {
-      client = createClient(request, "mikage");
-      clientsByRequest.set(request, client);
-    }
-    const { data, error } = await client.supabase.rpc("get_page_cache_revision").abortSignal(request.signal);
+    const result = await fetchMikageApi<{ revision: string | null }>("view-revision", { signal: request.signal });
     request.signal.throwIfAborted();
-    return !error && typeof data === "string" && data.length > 0 ? data : null;
+    return typeof result.revision === "string" && result.revision.length > 0 ? result.revision : null;
   } catch {
     request.signal.throwIfAborted();
     return null;

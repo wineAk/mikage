@@ -1,15 +1,26 @@
 import type { Route } from "./+types/watch";
-import { createClient } from "~/lib/supabase";
-import { getWatchSchedulerClient } from "~/lib/supabase/watchScheduler.server";
+import { fetchMikageApi } from "~/lib/mikageApi.server";
 import {
-  createWatchTargetStateUpdates,
   getServiceLabel,
   hasUnconfirmedFailures,
   toLogResults,
   type WatchTargetState,
 } from "~/library/watch/incidentState";
-import { getUtcMinute, getWatchSchedule } from "~/library/watch/schedule";
+import { getWatchSchedule } from "~/library/watch/schedule";
 import { checkTarget } from "~/library/watch/checkTarget";
+import { isAuthorizedWatchExecuteRequest } from "~/library/watch/executeAuth.mjs";
+import {
+  areExternalNotificationsEnabled,
+  isPreviewNotificationMockEnabled,
+  isWatchExecutionEnabled,
+} from "~/library/watch/notificationEnvironment.mjs";
+import { isIncidentNotificationDue } from "~/library/watch/incidentNotificationPolicy.mjs";
+import {
+  deliverActiveIncidentNotifications,
+  deliverResolvedIncidentNotifications,
+} from "~/library/watch/incidentNotificationDelivery.mjs";
+import { PreviewNotificationAbortError } from "~/library/watch/previewNotification.mjs";
+import { parseWatchSlot } from "~/library/watch/watchSlot.mjs";
 import {
   createIncidentInstatus,
   updateIncidentInstatus,
@@ -21,12 +32,6 @@ import {
   resolveThreadGoogleChat,
 } from "~/library/watch/googlechat";
 import type { LogResult } from "@/types/watch";
-import type { Database } from "@/types/supabase";
-
-const SUPABASE_TABLE_TARGETS = process.env.VITE_SUPABASE_TABLE_TARGETS as string;
-const SUPABASE_TABLE_LOGS = process.env.VITE_SUPABASE_TABLE_LOGS as string;
-const SUPABASE_TABLE_INCIDENTS = process.env.VITE_SUPABASE_TABLE_INCIDENTS as string;
-const SUPABASE_TABLE_WATCH_STATES = "watch_target_states";
 
 type IncidentLabel =
   | "saaske"
@@ -37,8 +42,23 @@ type IncidentLabel =
   | "works"
   | "web";
 
-type Incident = Database["mikage"]["Tables"]["incidents"]["Row"];
-type Target = Database["mikage"]["Tables"]["targets"]["Row"];
+type Incident = {
+  id: number | string;
+  keyword: string;
+  count: number;
+  created_at: string;
+  updated_at: string;
+  is_closed: boolean | null;
+  googlechat_name: string | null;
+  instatus_id: string | null;
+  notification_pending: boolean;
+};
+type Target = {
+  key: string;
+  name: string;
+  url: string;
+  headers: Record<string, string> | null;
+};
 
 const INCIDENT_LABELS: IncidentLabel[] = [
   "saaske",
@@ -99,43 +119,59 @@ function getInstatusSettings(label: IncidentLabel) {
 }
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const requestUrl = new URL(request.url);
-  const watchKey = requestUrl.searchParams.get("key");
-  if (watchKey !== process.env.VITE_WATCH_KEY) {
+  if (!isAuthorizedWatchExecuteRequest(request, process.env.MIKAGE_WATCH_EXECUTE_TOKEN)) {
     return jsonResponse({ error: "Invalid key." }, 401);
   }
+  if (!isWatchExecutionEnabled(process.env)) {
+    return jsonResponse({ error: "Preview watch execution is disabled." }, 503);
+  }
 
-  const schedule = await getWatchSchedule();
+  const watchSlot = parseWatchSlot(request.headers.get("X-Mikage-Watch-Slot"));
+  if (!watchSlot) {
+    return jsonResponse({ error: "監視slotが不正です。" }, 400);
+  }
+
+  const slotStart = watchSlot.slotStart;
+  const schedule = await getWatchSchedule(watchSlot.date);
   if (schedule.mode === "skip") {
     return skippedResponse(schedule.reason);
   }
 
   try {
-    const { supabase } = createClient(request, "mikage");
-    const { data: targets, error: targetError } = await supabase
-      .from(SUPABASE_TABLE_TARGETS)
-      .select("*")
-      .order("key", { ascending: true });
+    const externalNotificationsEnabled = areExternalNotificationsEnabled(process.env);
+    const previewNotificationMockEnabled = isPreviewNotificationMockEnabled(process.env);
+    const incidentNotificationsEnabled = externalNotificationsEnabled || previewNotificationMockEnabled;
+    const instatusClients = {
+      createIncident: createIncidentInstatus,
+      updateIncident: updateIncidentInstatus,
+      resolveIncident: resolveIncidentInstatus,
+    };
+    const googleChatClients = {
+      createThread: createThreadGoogleChat,
+      updateThread: updateThreadGoogleChat,
+      resolveThread: resolveThreadGoogleChat,
+    };
+    const reservation = await fetchMikageApi<{
+      selected_target_keys: string[];
+      selected_target_names: Record<string, string>;
+      saved_results: Array<{
+        target_key: string;
+        created_at: string;
+        response_time: number | null;
+        status_code: number | null;
+        status_message: string | null;
+        error_name: string | null;
+        error_code: string | null;
+      }> | null;
+    }>("watch-reservations", {
+      method: "POST",
+      body: { slot_start: slotStart, is_full_run: schedule.mode === "all" },
+      signal: request.signal,
+    });
+    const selectedKeys = reservation.selected_target_keys;
 
-    if (targetError || !targets?.length) {
-      console.error("監視対象をSupabaseから取得できませんでした。");
-      return jsonResponse({ error: "監視対象を取得できませんでした。" }, 503);
-    }
-
-    const schedulerSupabase = getWatchSchedulerClient();
-    const slotStart = getUtcMinute(new Date());
-    const targetKeys = targets.map(({ key }) => key);
-    const { data: selectedKeys, error: reservationError } = await schedulerSupabase.rpc(
-      "reserve_watch_run",
-      {
-        p_slot_start: slotStart,
-        p_is_full_run: schedule.mode === "all",
-        p_target_keys: targetKeys,
-      }
-    );
-
-    if (reservationError || !selectedKeys) {
-      console.error("監視枠をSupabaseで予約できませんでした。");
+    if (!Array.isArray(selectedKeys)) {
+      console.error("監視枠をミカゲAPIで予約できませんでした。");
       return jsonResponse({ error: "監視枠を予約できませんでした。" }, 503);
     }
 
@@ -143,69 +179,78 @@ export async function loader({ request }: Route.LoaderArgs) {
       return skippedResponse("slot_already_reserved");
     }
 
-    const selectedKeySet = new Set(selectedKeys);
-    const selectedTargets = targets.filter((target) => selectedKeySet.has(target.key));
-    const { data: previousStates, error: previousStateError } = await schedulerSupabase
-      .from(SUPABASE_TABLE_WATCH_STATES)
-      .select("*")
-      .in("target_key", selectedKeys);
+    const { targets: activeTargets } = await fetchMikageApi<{ targets: Target[] }>("watch-targets", { signal: request.signal });
+    const targetsByKey = new Map(activeTargets.map((target) => [target.key, target]));
+    for (const targetKey of selectedKeys) {
+      if (!targetsByKey.has(targetKey)) {
+        const name = reservation.selected_target_names[targetKey];
+        if (name) targetsByKey.set(targetKey, { key: targetKey, name, url: "", headers: null });
+      }
+    }
+    const targets = [...targetsByKey.values()];
+    const selectedTargets = selectedKeys.map((targetKey) => targetsByKey.get(targetKey)).filter((target): target is Target => target !== undefined);
+    if (selectedTargets.length !== selectedKeys.length) {
+      console.error("予約済みtargetを復元できませんでした。");
+      return jsonResponse({ error: "予約済みtargetを復元できませんでした。" }, 503);
+    }
 
-    if (previousStateError || !previousStates) {
-      console.error("対象別の監視状態をSupabaseから取得できませんでした。");
+    let results: LogResult[];
+    if (Array.isArray(reservation.saved_results)) {
+      results = reservation.saved_results.map((result) => {
+        const target = targetsByKey.get(result.target_key);
+        if (!target) throw new Error("保存済み結果のtargetを復元できませんでした。");
+        return {
+          key: result.target_key,
+          name: target.name,
+          log: {
+            startDate: Date.parse(result.created_at),
+            responseTime: result.response_time,
+            statusCode: result.status_code,
+            statusMessage: result.status_message,
+            errorName: result.error_name,
+            errorCode: result.error_code,
+          },
+        };
+      });
+    } else {
+      const checkTargets = selectedTargets.filter((target) => target.url.length > 0);
+      if (checkTargets.length !== selectedTargets.length) {
+        console.error("監視対象のURLを取得できませんでした。");
+        return jsonResponse({ error: "監視対象のURLを取得できませんでした。" }, 503);
+      }
+      results = await Promise.all(
+        checkTargets.map(async (target) => ({
+          key: target.key,
+          name: target.name,
+          log: await checkTarget({ url: target.url, headers: target.headers ?? undefined }),
+        }))
+      );
+
+      const logRows = results.map(({ key, log }) => ({
+        target_key: key,
+        created_at: new Date(log.startDate).toISOString(),
+        response_time: log.responseTime,
+        status_code: log.statusCode,
+        status_message: log.statusMessage,
+        error_name: log.errorName,
+        error_code: log.errorCode,
+      }));
+      const savedResults = await fetchMikageApi<{ saved: boolean }>("watch-results", {
+        method: "POST",
+        body: { slot_start: slotStart, results: logRows },
+        signal: request.signal,
+      });
+
+      if (!savedResults.saved) {
+        console.error("監視ログと状態をミカゲAPIへ保存できませんでした。");
+        return jsonResponse({ error: "監視状態を保存できませんでした。" }, 503);
+      }
+    }
+
+    const { states: targetStates, active_incidents: activeIncidents } = await fetchMikageApi<{ states: WatchTargetState[]; active_incidents: Incident[] }>("watch-state", { signal: request.signal });
+    if (!Array.isArray(targetStates) || !Array.isArray(activeIncidents)) {
+      console.error("監視状態をミカゲAPIから再取得できませんでした。");
       return jsonResponse({ error: "監視状態を取得できませんでした。" }, 503);
-    }
-
-    const results: LogResult[] = await Promise.all(
-      selectedTargets.map(async (target) => ({
-        key: target.key,
-        name: target.name,
-        log: await checkTarget({ url: target.url, headers: target.headers ?? undefined }),
-      }))
-    );
-
-    const logRows = results.map(({ key, log }) => ({
-      target_key: key,
-      created_at: new Date(log.startDate).toISOString(),
-      response_time: log.responseTime,
-      status_code: log.statusCode,
-      status_message: log.statusMessage,
-      error_name: log.errorName,
-      error_code: log.errorCode,
-    }));
-    const { error: logError } = await supabase.from(SUPABASE_TABLE_LOGS).insert(logRows);
-    if (logError) {
-      console.error("監視ログをSupabaseへ保存できませんでした。");
-    }
-
-    const stateUpdates = createWatchTargetStateUpdates(
-      results,
-      previousStates as WatchTargetState[],
-      slotStart
-    );
-    const { error: stateUpdateError } = await schedulerSupabase
-      .from(SUPABASE_TABLE_WATCH_STATES)
-      .upsert(stateUpdates, { onConflict: "target_key" });
-
-    if (stateUpdateError) {
-      console.error("対象別の監視状態をSupabaseへ保存できませんでした。");
-      return jsonResponse({ error: "監視状態を保存できませんでした。" }, 503);
-    }
-
-    const { data: targetStates, error: targetStatesError } = await schedulerSupabase
-      .from(SUPABASE_TABLE_WATCH_STATES)
-      .select("*");
-    if (targetStatesError || !targetStates) {
-      console.error("対象別の監視状態をSupabaseから再取得できませんでした。");
-      return jsonResponse({ error: "監視状態を取得できませんでした。" }, 503);
-    }
-
-    const { data: incidents, error: incidentsError } = await supabase
-      .from(SUPABASE_TABLE_INCIDENTS)
-      .select("*")
-      .is("is_closed", null);
-    if (incidentsError || !incidents) {
-      console.error("インシデント状態をSupabaseから取得できませんでした。");
-      return jsonResponse({ error: "インシデント状態を取得できませんでした。" }, 503);
     }
 
     async function handleIncident(
@@ -219,99 +264,121 @@ export async function loader({ request }: Route.LoaderArgs) {
       let isNewIncident = false;
 
       if (errors.length > 0 && !incident) {
-        const { data, error } = await supabase
-          .from(SUPABASE_TABLE_INCIDENTS)
-          .insert([{ keyword: label, count: 1, created_at: now.toISOString(), updated_at: now.toISOString() }])
-          .select("*")
-          .single();
-        if (error || !data) {
-          throw new Error("インシデントをSupabaseへ登録できませんでした。");
-        }
-        incident = data;
+        const created = await fetchMikageApi<{ incident_id: number | string; duplicate: boolean }>("watch-incidents", {
+          method: "POST",
+          body: {
+            request_id: `${slotStart}:${label}:open`,
+            operation: "open",
+            keyword: label,
+            incident_id: null,
+            now: now.toISOString(),
+            count: 1,
+          },
+          signal: request.signal,
+        });
+        if (!created.incident_id) throw new Error("インシデントをミカゲAPIへ登録できませんでした。");
+        incident = {
+          id: created.incident_id,
+          keyword: label,
+          count: 1,
+          created_at: now.toISOString(),
+          updated_at: now.toISOString(),
+          is_closed: null,
+          googlechat_name: null,
+          instatus_id: null,
+          notification_pending: true,
+        };
         isNewIncident = true;
       }
 
       if (errors.length > 0 && incident) {
-        const notificationIsDue =
-          isNewIncident || now.getTime() - Date.parse(incident.updated_at) >= 5 * 60 * 1000;
+        const notificationIsDue = isIncidentNotificationDue({
+          isNewIncident,
+          isNotificationPending: incident.notification_pending,
+          updatedAt: incident.updated_at,
+          now,
+        });
         if (!notificationIsDue) {
           return { status: "notification_interval_not_elapsed" };
         }
 
-        const errorCount = isNewIncident ? incident.count : incident.count + 1;
-        let instatusId = incident.instatus_id;
-        let googleChatName = incident.googlechat_name;
-        let instatusUrl: string | null = null;
-
-        if (pageId && component) {
-          if (!instatusId) {
-            const instatusResult = await createIncidentInstatus({
-              started: new Date(incident.created_at).toISOString(),
-              page_id: pageId,
-              components: [component],
-              serviceName,
-            });
-            instatusId = instatusResult?.incident?.id ?? instatusResult?.id ?? null;
-          } else {
-            const instatusResult = await updateIncidentInstatus(instatusId, {
-              started: now.toISOString(),
-              page_id: pageId,
-              components: [component],
-            });
-            instatusId = instatusResult?.incident?.id ?? instatusResult?.id ?? instatusId;
-          }
+        if (!incident.notification_pending) {
+          await fetchMikageApi("watch-incidents", {
+            method: "POST",
+            body: {
+              request_id: `${slotStart}:${label}:pending`,
+              operation: "notification_pending",
+              keyword: label,
+              incident_id: incident.id,
+              now: slotStart,
+            },
+            signal: request.signal,
+          });
+          incident.notification_pending = true;
         }
 
-        if (instatusId) {
-          const subDomain = label === "works" ? "works" : "saaske";
-          instatusUrl = `https://${subDomain}.instatus.com/${instatusId}`;
-        }
+        const errorCount = isNewIncident ? Number(incident.count) : Number(incident.count) + 1;
+        const delivery = await deliverActiveIncidentNotifications({
+          environment: process.env,
+          label,
+          errors,
+          incident,
+          pageId,
+          component,
+          serviceName,
+          now,
+          instatusClients,
+          googleChatClients,
+        });
+        const instatusId = delivery.instatusId;
+        const googleChatName = delivery.googleChatName;
 
-        if (!googleChatName) {
-          const googleChatResult = await createThreadGoogleChat(errors, instatusUrl);
-          googleChatName = googleChatResult?.thread?.name ?? null;
-          if (googleChatName) {
-            await updateThreadGoogleChat(errors, googleChatName);
-          }
-        } else {
-          await updateThreadGoogleChat(errors, googleChatName);
-        }
-
-        const { error } = await supabase
-          .from(SUPABASE_TABLE_INCIDENTS)
-          .update({
+        await fetchMikageApi("watch-incidents", {
+          method: "POST",
+          body: {
+            request_id: `${slotStart}:${label}:update`,
+            operation: "update",
+            keyword: label,
+            incident_id: incident.id,
+            now: now.toISOString(),
             count: errorCount,
-            updated_at: now.toISOString(),
             googlechat_name: googleChatName,
             instatus_id: instatusId,
-          })
-          .eq("id", incident.id);
-        if (error) {
-          throw new Error("インシデント状態をSupabaseへ保存できませんでした。");
-        }
+          },
+          signal: request.signal,
+        });
 
+        if (!incidentNotificationsEnabled) {
+          return { status: "recorded_without_notifications" };
+        }
+        if (previewNotificationMockEnabled) {
+          return { status: isNewIncident ? "preview_mock_notified" : "preview_mock_updated" };
+        }
         return { status: isNewIncident ? "notified" : "updated" };
       }
 
       if (errors.length === 0 && incident) {
-        if (incident.googlechat_name) {
-          await resolveThreadGoogleChat([], incident.googlechat_name);
-        }
-        if (incident.instatus_id && pageId && component) {
-          await resolveIncidentInstatus(incident.instatus_id, {
-            started: now.toISOString(),
-            page_id: pageId,
-            components: [component],
-          });
-        }
+        await deliverResolvedIncidentNotifications({
+          environment: process.env,
+          incident,
+          pageId,
+          component,
+          now,
+          instatusClients,
+          googleChatClients,
+        });
 
-        const { error } = await supabase
-          .from(SUPABASE_TABLE_INCIDENTS)
-          .update({ is_closed: true, updated_at: now.toISOString() })
-          .eq("id", incident.id);
-        if (error) {
-          throw new Error("インシデントをSupabaseで解決できませんでした。");
-        }
+        await fetchMikageApi("watch-incidents", {
+          method: "POST",
+          body: {
+            request_id: `${slotStart}:${label}:close`,
+            operation: "close",
+            keyword: label,
+            incident_id: incident.id,
+            now: now.toISOString(),
+          },
+          signal: request.signal,
+        });
         return { status: "resolved" };
       }
 
@@ -330,7 +397,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         true
       );
       const hasPendingFailures = hasUnconfirmedFailures(serviceStates);
-      const incident = incidents.find((item) => item.keyword === label);
+      const incident = activeIncidents.find((item) => item.keyword === label);
 
       if (confirmedErrors.length > 0) {
         resultsByLabel[label] = await handleIncident(label, confirmedErrors, incident);
@@ -370,6 +437,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     });
 
   } catch (error) {
+    if (error instanceof PreviewNotificationAbortError) {
+      console.error("監視処理に失敗しました。", error.name);
+      return jsonResponse({ error: "監視処理に失敗しました。" }, 503);
+    }
     console.error(
       "監視処理に失敗しました。",
       error instanceof Error ? error.name : "UnknownError"

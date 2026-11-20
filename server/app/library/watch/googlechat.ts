@@ -1,7 +1,19 @@
 import type { LogResult } from "@/types/watch";
+import { parseSuccessfulNotificationResponse } from "./notificationResponse.mjs";
+import { areExternalNotificationsEnabled } from "./notificationEnvironment.mjs";
+
+function assertRealGoogleChatNetworkAllowed() {
+  if (!areExternalNotificationsEnabled(process.env)) {
+    throw new Error("Google Chat notifications are disabled in this environment.");
+  }
+}
 
 const googleChatWebhookUrl = process.env.VITE_GOOGLE_WEBHOOK_URL || "";
 const headers = { "Content-Type": "application/json" };
+
+type GoogleChatResponse = {
+  thread?: { name?: string };
+};
 
 // エラー内容をcardsV2化
 // CARD: https://addons.gsuite.google.com/uikit/builder?hl=ja
@@ -76,12 +88,13 @@ function createCardsV2(errors: LogResult[]) {
 
 // Google Chat APIリクエスト送信
 export async function sendGoogleChatRequest(url: string, body: any) {
+  assertRealGoogleChatNetworkAllowed();
   const res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
   });
-  return await res.json();
+  return await parseSuccessfulNotificationResponse<GoogleChatResponse>(res, "Google Chat");
 }
 
 // スレッド新規作成

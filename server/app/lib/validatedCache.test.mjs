@@ -5,12 +5,12 @@ import { createServer } from "node:http";
 import { createValidatedCache } from "./validatedCache.ts";
 
 registerHooks({ resolve(specifier, context, nextResolve) {
-  if (specifier === "./supabase") return nextResolve("./supabase/index.ts", context);
-  if (["./monthRange", "./validatedCache", "./pageRevision.server"].includes(specifier)) return nextResolve(`${specifier}.ts`, context);
+  if (["./monthRange", "./validatedCache", "./pageRevision.server", "./mikageApi.server"].includes(specifier)) return nextResolve(`${specifier}.ts`, context);
   return nextResolve(specifier, context);
 } });
 const { getPageCacheScope, isPageCacheEligible, readPageRevision } = await import("./pageRevision.server.ts");
 const { createPageHeaders, getPageCacheRevision, hasPageVersionConflict, readErrors, readLogs, readTargets, resetPageQueries } = await import("./pageQueries.server.ts");
+const { fetchMikageApi } = await import("./mikageApi.server.ts");
 
 function deferred() {
   let resolve;
@@ -183,94 +183,313 @@ test("allows anonymous analytics cookies but bypasses every recognized auth cont
   assert.equal(await readPageRevision(authorized), null);
 });
 
-test("hashes the complete cookie and project context without retaining raw values", () => {
-  const previousProject = process.env.VITE_SUPABASE_URL;
-  const previousKey = process.env.VITE_SUPABASE_ANON_KEY;
+test("PR Previewはapp未設定でpage cache scopeを付けない", () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
   try {
-    process.env.VITE_SUPABASE_URL = "https://project-one.example.test";
-    process.env.VITE_SUPABASE_ANON_KEY = "example-key";
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-one.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-key";
+    process.env.IS_PULL_REQUEST = "true";
+    delete process.env.MIKAGE_GATEWAY_APP;
+    const request = new Request("https://example.test/");
+    assert.equal(getPageCacheScope(request), null);
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
+    assert.notEqual(getPageCacheScope(request), null);
+    process.env.MIKAGE_GATEWAY_APP = "mikage";
+    assert.equal(getPageCacheScope(request), null);
+  } finally {
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("hashes the complete cookie and project context without retaining raw values", () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-one.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-key";
     const first = new Request("https://example.test", { headers: { Cookie: "_ga=some-private-value; preference=one" } });
     const second = new Request("https://example.test", { headers: { Cookie: "_ga=some-private-value; preference=two" } });
     const scope = getPageCacheScope(first);
     assert.match(scope, /^[a-f0-9]{64}$/);
     assert.notEqual(scope, getPageCacheScope(second));
-    process.env.VITE_SUPABASE_URL = "https://project-two.example.test";
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-two.example.test";
+    assert.notEqual(scope, getPageCacheScope(first));
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway-one.example.test";
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
     assert.notEqual(scope, getPageCacheScope(first));
     assert.equal(scope.includes("some-private-value"), false);
   } finally {
-    if (previousProject === undefined) delete process.env.VITE_SUPABASE_URL;
-    else process.env.VITE_SUPABASE_URL = previousProject;
-    if (previousKey === undefined) delete process.env.VITE_SUPABASE_ANON_KEY;
-    else process.env.VITE_SUPABASE_ANON_KEY = previousKey;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
   }
 });
 
-async function withDatabaseFixture(execute) {
-  const previousProject = process.env.VITE_SUPABASE_URL;
-  const previousKey = process.env.VITE_SUPABASE_ANON_KEY;
+test("Gateway base URLはorigin rootに限定し、重複prefixを拒否する", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test/office/mikage";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+  } finally {
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+  }
+});
+
+test("Gateway app名は形式を検証し、通常serviceではStagingを拒否する", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    for (const invalidApp of ["../admin", "Mikage", "mikage/app", "mikage_app"]) {
+      process.env.MIKAGE_GATEWAY_APP = invalidApp;
+      await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    }
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
+    process.env.IS_PULL_REQUEST = "false";
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+  } finally {
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("未設定appはProduction、許可文字のappは指定namespaceを使う", async () => {
+  await withGatewayFixture(async (state) => {
+    await fetchMikageApi("view-targets");
+    assert.equal(state.requests.at(-1).path, "/office/mikage/view-targets");
+
+    process.env.MIKAGE_GATEWAY_APP = "review-123";
+    await fetchMikageApi("view-targets");
+    assert.equal(state.requests.at(-1).path, "/office/review-123/view-targets");
+  });
+});
+
+async function withGatewayFixture(execute) {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
   const previousCacheEnabled = process.env.PAGE_CACHE_ENABLED;
-  const state = { revision: "1", targetName: "before", revisionAvailable: true, flipOnErrors: false, requests: [] };
+  const previousFetch = globalThis.fetch;
+  const gatewayOrigin = "https://gateway.example.test";
+  const apiToken = "example-api-token";
+  const state = { revision: "1", targetName: "before", revisionAvailable: true, flipOnErrors: false, requests: [], apiToken };
   const server = createServer(async (request, response) => {
-    const path = new URL(request.url, "http://127.0.0.1").pathname;
-    let body = "";
-    for await (const chunk of request) body += chunk;
-    state.requests.push({ path, parameters: body ? JSON.parse(body) : null });
+    const requestUrl = new URL(request.url, "http://127.0.0.1");
+    const path = requestUrl.pathname;
+    state.requests.push({ path, query: requestUrl.searchParams, authorization: request.headers.authorization });
     response.setHeader("Content-Type", "application/json");
-    if (path.endsWith("/get_page_cache_revision")) {
-      if (!state.revisionAvailable) { response.writeHead(404); response.end(JSON.stringify({ code: "PGRST202", message: "missing" })); return; }
-      response.end(JSON.stringify(state.revision));
-    } else if (path.endsWith("/targets")) {
-      response.end(JSON.stringify([{ key: "example", name: state.targetName }]));
-    } else if (path.endsWith("/get_error_logs")) {
+    if (request.headers.authorization !== `Bearer ${state.apiToken}`) {
+      response.writeHead(401);
+      response.end(JSON.stringify({ error: "Unauthorized" }));
+    } else if (path.endsWith("/view-revision")) {
+      if (!state.revisionAvailable) { response.writeHead(503); response.end(JSON.stringify({ error: "unavailable" })); return; }
+      response.end(JSON.stringify({ revision: state.revision }));
+    } else if (path.endsWith("/view-targets")) {
+      response.end(JSON.stringify({ targets: [{ key: "example", name: state.targetName }] }));
+    } else if (path.endsWith("/view-errors")) {
       state.onErrors?.();
       if (state.flipOnErrors) { state.flipOnErrors = false; state.revision = "2"; state.targetName = "after-change"; }
-      response.end(JSON.stringify({ logs: [], previous_month_count: 0, next_month_count: 0 }));
-    } else if (path.endsWith("/get_logs_in_range")) {
-      response.end(JSON.stringify([{ key: "example", name: state.targetName, logs: [] }]));
+      response.end(JSON.stringify({ data: { logs: [], previous_month_count: 0, next_month_count: 0 } }));
+    } else if (path.endsWith("/view-logs")) {
+      response.end(JSON.stringify({ data: [{ key: "example", name: state.targetName, logs: [] }] }));
+    } else if (path.endsWith("/view-incidents")) {
+      response.end(JSON.stringify({ data: [] }));
+    } else if (path.endsWith("/watch-results") && request.method === "POST") {
+      response.end(JSON.stringify({ saved: true }));
     } else { response.writeHead(404); response.end(JSON.stringify({ code: "missing" })); }
   });
   try {
     await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-    process.env.VITE_SUPABASE_URL = `http://127.0.0.1:${server.address().port}`;
-    process.env.VITE_SUPABASE_ANON_KEY = "example-anon-key";
+    process.env.MIKAGE_GATEWAY_BASE_URL = gatewayOrigin;
+    process.env.MIKAGE_API_BEARER_TOKEN = apiToken;
+    delete process.env.MIKAGE_GATEWAY_APP;
+    delete process.env.IS_PULL_REQUEST;
     process.env.PAGE_CACHE_ENABLED = "true";
+    globalThis.fetch = (input, init) => {
+      const requestUrl = new URL(input);
+      if (requestUrl.origin !== gatewayOrigin) return previousFetch(input, init);
+      const localUrl = `http://127.0.0.1:${server.address().port}${requestUrl.pathname}${requestUrl.search}`;
+      return previousFetch(localUrl, init);
+    };
     await execute(state);
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
-    if (previousProject === undefined) delete process.env.VITE_SUPABASE_URL;
-    else process.env.VITE_SUPABASE_URL = previousProject;
-    if (previousKey === undefined) delete process.env.VITE_SUPABASE_ANON_KEY;
-    else process.env.VITE_SUPABASE_ANON_KEY = previousKey;
+    globalThis.fetch = previousFetch;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
     if (previousCacheEnabled === undefined) delete process.env.PAGE_CACHE_ENABLED;
     else process.env.PAGE_CACHE_ENABLED = previousCacheEnabled;
   }
 }
 
-test("disabled page cache reads fresh data without metadata RPC requests", async () => {
-  await withDatabaseFixture(async state => {
+test("Preview app設定で同じGateway hostからStaging namespaceへ送る", async () => {
+  await withGatewayFixture(async (state) => {
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
+    process.env.IS_PULL_REQUEST = "true";
+    await fetchMikageApi("view-targets", { query: new URLSearchParams({ source: "preview" }) });
+    assert.equal(state.requests[0].path, "/office/mikage-staging/view-targets");
+    assert.equal(state.requests[0].query.get("source"), "preview");
+    assert.equal(state.requests[0].authorization, "Bearer example-api-token");
+  });
+});
+
+test("Bearer tokenの接頭辞はGateway app pathの選択に影響しない", async () => {
+  await withGatewayFixture(async (state) => {
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
+    process.env.IS_PULL_REQUEST = "true";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-staging-prefixed-token";
+    state.apiToken = process.env.MIKAGE_API_BEARER_TOKEN;
+    await fetchMikageApi("view-targets");
+    const pathWithPrefix = state.requests.at(-1).path;
+
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-unprefixed-token";
+    state.apiToken = process.env.MIKAGE_API_BEARER_TOKEN;
+    await fetchMikageApi("view-targets");
+    assert.equal(state.requests.at(-1).path, pathWithPrefix);
+    assert.equal(pathWithPrefix, "/office/mikage-staging/view-targets");
+  });
+});
+
+test("PR Previewはapp未設定でfail closedし、fetchを呼ばない", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    process.env.IS_PULL_REQUEST = "true";
+    delete process.env.MIKAGE_GATEWAY_APP;
+    globalThis.fetch = (...arguments_) => {
+      fetchCalls++;
+      return previousFetch(...arguments_);
+    };
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("PR PreviewはProduction appを拒否し、fetchを呼ばない", async () => {
+  const previousGateway = process.env.MIKAGE_GATEWAY_BASE_URL;
+  const previousToken = process.env.MIKAGE_API_BEARER_TOKEN;
+  const previousGatewayApp = process.env.MIKAGE_GATEWAY_APP;
+  const previousIsPullRequest = process.env.IS_PULL_REQUEST;
+  const previousFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  try {
+    process.env.MIKAGE_GATEWAY_BASE_URL = "https://gateway.example.test";
+    process.env.MIKAGE_API_BEARER_TOKEN = "example-api-token";
+    process.env.IS_PULL_REQUEST = "true";
+    process.env.MIKAGE_GATEWAY_APP = "mikage";
+    globalThis.fetch = (...arguments_) => {
+      fetchCalls++;
+      return previousFetch(...arguments_);
+    };
+    await assert.rejects(fetchMikageApi("view-targets"), /Gatewayの設定が不正です/);
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousGateway === undefined) delete process.env.MIKAGE_GATEWAY_BASE_URL;
+    else process.env.MIKAGE_GATEWAY_BASE_URL = previousGateway;
+    if (previousToken === undefined) delete process.env.MIKAGE_API_BEARER_TOKEN;
+    else process.env.MIKAGE_API_BEARER_TOKEN = previousToken;
+    if (previousGatewayApp === undefined) delete process.env.MIKAGE_GATEWAY_APP;
+    else process.env.MIKAGE_GATEWAY_APP = previousGatewayApp;
+    if (previousIsPullRequest === undefined) delete process.env.IS_PULL_REQUEST;
+    else process.env.IS_PULL_REQUEST = previousIsPullRequest;
+  }
+});
+
+test("PR PreviewのStaging prefixはwatch POSTも同一namespaceへ送る", async () => {
+  await withGatewayFixture(async (state) => {
+    process.env.MIKAGE_GATEWAY_APP = "mikage-staging";
+    process.env.IS_PULL_REQUEST = "true";
+    const result = await fetchMikageApi("watch-results", {
+      method: "POST",
+      body: { results: [{ key: "example", status: "ok" }] },
+    });
+    assert.equal(result.saved, true);
+    assert.equal(state.requests.at(-1).path, "/office/mikage-staging/watch-results");
+    assert.equal(state.requests.at(-1).authorization, "Bearer example-api-token");
+  });
+});
+
+test("disabled page cache reads fresh data without revision API requests", async () => {
+  await withGatewayFixture(async state => {
     process.env.PAGE_CACHE_ENABLED = "false";
     const { readTargets } = await import("./pageQueries.server.ts");
     assert.equal((await readTargets(new Request("https://example.test/")))[0].name, "before");
     state.targetName = "latest";
     assert.equal((await readTargets(new Request("https://example.test/")))[0].name, "latest");
-    assert.equal(state.requests.filter(item => item.path.endsWith("/get_page_cache_revision")).length, 0);
-    assert.equal(state.requests.filter(item => item.path.endsWith("/targets")).length, 2);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-revision")).length, 0);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-targets")).length, 2);
   });
 });
 
-test("request integration validates hits, fails fresh when revision RPC is missing, and bypasses session cookies", async () => {
-  await withDatabaseFixture(async state => {
+test("request integration validates cache hits, fails fresh when revision API is missing, and bypasses session cookies", async () => {
+  await withGatewayFixture(async state => {
     const request = () => new Request("https://example.test/");
     const first = request();
     assert.equal((await readTargets(first))[0].name, "before");
+    assert.equal(state.requests[0].path, "/office/mikage/view-revision");
     assert.equal(getPageCacheRevision(first), "1");
-    assert.equal(state.requests.filter(item => item.path.endsWith("/get_page_cache_revision")).length, 2);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-revision")).length, 2);
     assert.match(createPageHeaders(first).get("Server-Timing"), /page_cache_miss;desc="1"/);
     const second = request();
     await readTargets(second);
-    assert.equal(state.requests.filter(item => item.path.endsWith("/targets")).length, 1);
-    assert.equal(state.requests.filter(item => item.path.endsWith("/get_page_cache_revision")).length, 3);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-targets")).length, 1);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-revision")).length, 3);
     assert.match(createPageHeaders(second).get("Server-Timing"), /page_cache_hit;desc="1"/);
     assert.match(createPageHeaders(second).get("Cache-Control"), /private, no-store/);
     state.revisionAvailable = false;
@@ -279,16 +498,16 @@ test("request integration validates hits, fails fresh when revision RPC is missi
     assert.equal((await readTargets(missing))[0].name, "latest");
     assert.equal(getPageCacheRevision(missing), null);
     assert.equal(hasPageVersionConflict(missing), false);
-    const revisionReads = state.requests.filter(item => item.path.endsWith("/get_page_cache_revision")).length;
+    const revisionReads = state.requests.filter(item => item.path.endsWith("/view-revision")).length;
     const session = new Request("https://example.test/", { headers: { Cookie: "sb-example-auth-token.0=example" } });
     assert.equal((await readTargets(session))[0].name, "latest");
     assert.equal(getPageCacheRevision(session), null);
-    assert.equal(state.requests.filter(item => item.path.endsWith("/get_page_cache_revision")).length, revisionReads);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-revision")).length, revisionReads);
   });
 });
 
 test("request integration detects mixed query versions and resets whole-loader validation", async () => {
-  await withDatabaseFixture(async state => {
+  await withGatewayFixture(async state => {
     state.flipOnErrors = true;
     const request = new Request("https://example.test/incidents");
     await Promise.all([readTargets(request), readErrors(request, 0)]);
@@ -304,18 +523,18 @@ test("request integration detects mixed query versions and resets whole-loader v
 });
 
 test("request integration never reuses rolling logs across different exact time windows", async () => {
-  await withDatabaseFixture(async state => {
+  await withGatewayFixture(async state => {
     const first = new Request("https://example.test/");
     await readLogs(first, ["example"], 60, new Date("2026-11-01T10:00:00.000Z"));
     const second = new Request("https://example.test/");
     await readLogs(second, ["example"], 60, new Date("2026-11-01T10:00:00.001Z"));
-    assert.equal(state.requests.filter(item => item.path.endsWith("/get_logs_in_range")).length, 2);
+    assert.equal(state.requests.filter(item => item.path.endsWith("/view-logs")).length, 2);
     assert.equal(getPageCacheRevision(first), "1");
     assert.equal(getPageCacheRevision(second), "1");
   });
 });
 
-test("does not store relative-month RPC data under the previous month's cache key", async () => {
+test("does not store relative-month API data under the previous month's cache key", async () => {
   const NativeDate = Date;
   let currentTime = "2026-11-30T14:59:59.999Z";
   globalThis.Date = class extends NativeDate {
@@ -323,7 +542,7 @@ test("does not store relative-month RPC data under the previous month's cache ke
     static now() { return NativeDate.parse(currentTime); }
   };
   try {
-    await withDatabaseFixture(async state => {
+    await withGatewayFixture(async state => {
       state.onErrors = () => { currentTime = "2026-11-30T15:00:00.000Z"; };
       const request = new Request("https://example.test/errors");
       await assert.rejects(readErrors(request, 0), { name: "PageSnapshotConflictError" });

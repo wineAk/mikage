@@ -1,5 +1,5 @@
 import type { Route } from "./+types/errors";
-import { createClient } from "~/lib/supabase";
+import { fetchMikageApi } from "~/lib/mikageApi.server";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   // パラメータを取得
@@ -8,11 +8,8 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const offset = /^\d+$/.test(offsetTxt) ? Number(offsetTxt) : 0;
 
   // データ取得
-  const { supabase } = createClient(request, "mikage");
-  const { data, error } = await supabase.rpc("get_error_logs", {
-    start_offset: offset,
-    end_offset: offset - 1,
-  });
+  const { data } = await fetchMikageApi<{ data: unknown; error: null }>("view-errors", { query: new URLSearchParams({ offset: String(offset) }), signal: request.signal });
+  const error = null;
 
   return new Response(JSON.stringify({ data, error }), {
     headers: { "Content-Type": "application/json" },
