@@ -9,7 +9,7 @@ test("missing scheduler state returns an independent initial state", async () =>
   try {
     const initialState = { startedAt: "2026-11-17T00:00:00.000Z", jobSuccessAt: {} };
     const state = await loadSchedulerState(join(directory, "state.json"), initialState);
-    state.jobSuccessAt.prune = "2026-11-17T00:01:00.000Z";
+    state.jobSuccessAt.reindex_logs = "2026-11-17T00:01:00.000Z";
 
     assert.deepEqual(initialState.jobSuccessAt, {});
   } finally {

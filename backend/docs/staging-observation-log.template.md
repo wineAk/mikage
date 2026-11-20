@@ -28,7 +28,7 @@
 - 各項目は `PASS` / `FAIL` / `UNDECIDED` / `N/A` で記録する。期待どおりの `watch-scheduler absent` と、観察期間内に実行予定がないmaintenance jobは `N/A`。
 - Compose serviceは期待するserviceが `healthy` ならPASS。API `/health` は200かつ `status=ok` を期待する。migration stateは別に記録する。
 - watch有効時はscheduler health JSONが `status=ok` で、`lastStatus=succeeded`、`lastSuccessAt` が3分以内であることを確認する。起動後3分以内の猶予はscheduler実装に従う。profile無効時はservice absentが期待状態。
-- maintenance health JSONが `status=ok` であること。観察期間にJST毎月1日03:00 prune、03:05 logs reindex、03:07 incidents reindexのdueを跨ぐ場合だけ、そのjobの `jobSuccessAt` がdue以降であることを確認する。dueを跨がないjobはN/A。
+- maintenance health JSONが `status=ok` であること。観察期間にJST毎月1日03:05 logs reindex、03:07 incidents reindexのdueを跨ぐ場合だけ、そのjobの `jobSuccessAt` がdue以降であることを確認する。maintenance schedulerは行データを削除しない。dueを跨がないjobはN/A。
 - HTTP probeは下の契約に合えばPASS。Gateway staging routeがない場合の404は隔離経路未完了としてFAIL。
 - migration gateは、観察開始前にverifierが成功し、 `data_verified=true` かつ `verified_at` があることを確認する。Productionでは同一snapshotのpreflight/import/verify、期間別集計、sequence/FK照合を別証跡で確認する。
 - request failure数やDB増分は毎回記録する。repoで閾値が決まっていない項目はUNDECIDEDであり、数値を記録しただけではPASSにしない。

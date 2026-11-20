@@ -9,7 +9,7 @@ Render PR Previewでは `IS_PULL_REQUEST=true` を検出し、`MIKAGE_PREVIEW_WA
 - `compose/`: 専用 Postgres・API・migration ワンショット・Render起動scheduler・DB maintenance scheduler
 - `db/`: version 順 migration、`reserve_watch_run`、logs/incidents専用maintenance role、開発 seed
 - `api/`: Express API（health、monitoring予約/結果、incident state遷移、View read、target管理画面/API）
-- `scheduler/`: Render起動workerとJSTのretention/reindex worker
+- `scheduler/`: Render起動workerとJSTのreindex worker
 
 ## 含まれないもの（ルート計画どおり）
 
@@ -52,8 +52,8 @@ docker compose -f docker-compose.yml exec -T postgres \
 ### migration の再適用
 
 `migrate` サービスは起動のたびに `schema_migrations` を参照し、未適用分だけ実行する。
-`api` と `maintenance-scheduler` は通常serviceとして起動する。`/health` を除くAPI routeは `mikage.migration_state.data_verified` がtrueになるまで503で閉じ、healthcheckはDB接続だけを確認する。maintenance schedulerはAPI healthcheckとschema migrationの完了後に起動し、各削除・REINDEX jobの直前にも同じDBゲートを確認する。watch schedulerだけを `watch` profileに置き、GAS/Render切替の承認が済むまで起動しない。Dokploy環境の `COMPOSE_PROFILES` は移行と初期確認中は空欄にする。watch切替の承認後にだけ、対象service内で `watch` profileを有効にし、`WATCH_SCHEDULER_ENABLED=true` とRender URL/tokenを設定する。他のserviceやDokploy全体設定には触れない。
-PostgreSQL管理ユーザーとmigration serviceが `mikage_api` と `mikage_maintenance` roleを管理する。API runtimeは `mikage_api`、maintenance workerは `logs` / `incidents` と2つの冪等性batch表だけを所有するroleで接続する。logs/incidentsはevent時刻、冪等性記録は `saved_at` を基準に、いずれもJST前月初境界で削除する。watch schedulerはRender用tokenだけを持ち、DB/API networkに参加しない。ローカルは無効、Dokployは対象Compose serviceの環境変数で有効を明示し、Render URL/token未設定時は起動に失敗する。接続設定はURL連結を避け、個別の `PG*` 環境変数で渡す。
+`api` と `maintenance-scheduler` は通常serviceとして起動する。`/health` を除くAPI routeは `mikage.migration_state.data_verified` がtrueになるまで503で閉じ、healthcheckはDB接続だけを確認する。maintenance schedulerはAPI healthcheckとschema migrationの完了後に起動し、各REINDEX jobの直前にも同じDBゲートを確認する。watch schedulerだけを `watch` profileに置き、GAS/Render切替の承認が済むまで起動しない。Dokploy環境の `COMPOSE_PROFILES` は移行と初期確認中は空欄にする。watch切替の承認後にだけ、対象service内で `watch` profileを有効にし、`WATCH_SCHEDULER_ENABLED=true` とRender URL/tokenを設定する。他のserviceやDokploy全体設定には触れない。
+PostgreSQL管理ユーザーとmigration serviceが `mikage_api` と `mikage_maintenance` roleを管理する。API runtimeは `mikage_api`、maintenance workerは専用の `mikage_maintenance` roleで接続し、logs/incidentsをREINDEXする。maintenance schedulerは監視データや冪等性記録を自動削除せず、既定で無期限に保持する。watch schedulerはRender用tokenだけを持ち、DB/API networkに参加しない。ローカルは無効、Dokployは対象Compose serviceの環境変数で有効を明示し、Render URL/token未設定時は起動に失敗する。接続設定はURL連結を避け、個別の `PG*` 環境変数で渡す。
 
 ### Supabase データ移行（手動ワンショット）
 
@@ -141,7 +141,7 @@ Render source allowlist、API `/gw` method/path、既存API endpointへのdispat
 - 稼働中Caddyのupstreamは `https://mikage.inter.dedyn.io` で、TLS証明書検証を維持する。Caddyは `/office/mikage/*` を共通routeで `/gw/*` へ転送し、APIが許可routeを限定する。
 - DokployのGit Compose pathは`backend/compose/docker-compose.yml`を指定する。build contextが同directoryから`../api`, `../db`, `../scheduler`を参照することをPreview/buildで確認する。
 - Renderの `MIKAGE_GATEWAY_BASE_URL` はorigin rootの `https://gw.inter.dedyn.io` にする。Render clientが `/office/mikage/<source>` を付けるため、path prefixは設定しない（clientもroot以外を拒否する）。CloudFront behaviorが`/office/mikage/*`をGateway origin groupへ流すこと、Custom Origin Request PolicyでAuthorizationをforwardしquery stringsはすべてforwardすることを確認する。Cache Policyはmanaged `CachingDisabled`（TTLすべて0）。POSTを許可するためCloudFront Allowed Methodsは全7 methodとなるが、Caddyは契約したGET/POST以外を404にする。Managed-AllViewerは既存originのHost routingを変える可能性があるので使わず、Authorizationが標準/リアルタイムログへ記録されないことを確認する。
-- `watch-scheduler` はRender起動用tokenだけを持ち、PostgreSQL/APIの `mikage_internal` networkに参加しない。`maintenance-scheduler` は別serviceとして、`logs`、`incidents`、`watch_result_batches`、`incident_transition_batches` だけを所有する `mikage_maintenance` roleで削除/reindexする。
+- `watch-scheduler` はRender起動用tokenだけを持ち、PostgreSQL/APIの `mikage_internal` networkに参加しない。`maintenance-scheduler` は別serviceとして、`logs`、`incidents`、`watch_result_batches`、`incident_transition_batches` を削除せず、`logs` / `incidents` のREINDEXだけを実行する。
 - 管理画面 `/admin` と `/v1/admin/*` は未認証である。LAN内の専用service domainからのみ利用し、VPS Gatewayの公開経路へ流さず、N094のFW/NATで外部到達を拒否することをdeploy前提とする。
 - `MIKAGE_ADMIN_ALLOWED_HOSTS` は必須で、管理routeは許可Hostの完全一致だけ応答する。本番ではLAN向けDokploy service domainだけを指定し、公開Gateway Hostは含めない。
 - `MIKAGE_TARGET_ALLOWED_HOSTS` は実際のenabled target URL hostを完全一致で列挙する。管理APIは新規/更新/再有効化時、監視APIは有効targetをRenderへ返す前にURL/headersを検査し、migration verifierはSupabase/移行先の有効targetを照合する。disabled targetは監視・previewで使用しない。未設定または不一致ならfail closedにする。値はDokployのAPI serviceと一時migration-verify serviceへ同じものを設定する。

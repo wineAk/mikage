@@ -57,17 +57,19 @@ test("watch schedulerは起動猶予後の未実行と古い最終成功をdegra
   }, new Date("2026-11-17T00:03:00.001Z")), false);
 });
 
-test("maintenance schedulerは予定時刻後の猶予中は待ち、未実行が続けばdegradedにする", () => {
+test("maintenance schedulerはreindex予定時刻後の猶予中は待ち、未実行が続けばdegradedにする", () => {
   const health = {
     startedAt: "2026-11-01T02:00:00+09:00",
     lastStatus: "succeeded",
     jobSuccessAt: {
-      prune: "2026-11-01T03:00:00+09:00",
       reindex_logs: "2026-11-01T03:05:00+09:00",
+      reindex_incidents: "2026-11-01T03:07:00+09:00",
     },
   };
 
   assert.equal(isMaintenanceSchedulerHealthy(health, new Date("2026-11-01T03:21:59+09:00")), true);
+  assert.equal(isMaintenanceSchedulerHealthy(health, new Date("2026-11-01T03:22:01+09:00")), true);
+  delete health.jobSuccessAt.reindex_incidents;
   assert.equal(isMaintenanceSchedulerHealthy(health, new Date("2026-11-01T03:22:01+09:00")), false);
 });
 

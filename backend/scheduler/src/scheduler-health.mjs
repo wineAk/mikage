@@ -2,7 +2,6 @@ const WATCH_SUCCESS_MAX_AGE_MS = 3 * 60 * 1000;
 const WATCH_STARTUP_GRACE_MS = 3 * 60 * 1000;
 const MAINTENANCE_JOB_GRACE_MS = 15 * 60 * 1000;
 const MAINTENANCE_JOBS = [
-  { name: "prune", minute: 0 },
   { name: "reindex_logs", minute: 5 },
   { name: "reindex_incidents", minute: 7 },
 ];
